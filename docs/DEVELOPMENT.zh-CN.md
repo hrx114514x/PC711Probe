@@ -2,7 +2,7 @@
 
 [English](DEVELOPMENT.en.md) | 简体中文
 
-PC711Probe 0.6.0 按照“复现故障 → 参照新系统 → 定位差异 → 最小补丁 → 硬件验证”的路线完成。
+PC711Probe 按照“复现故障 → 参照新系统 → 定位差异 → 最小补丁 → 硬件验证”的路线完成。
 
 ## 1. 复现并确定故障边界
 
@@ -29,16 +29,14 @@ IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0);
 
 ## 3. 实现最小兼容补丁
 
-PC711Probe 通过 Lilu 只路由 `CreateDeviceInterrupt`，并严格限制生效条件：
+PC711Probe 通过 Lilu 只路由 `CreateDeviceInterrupt`：
 
-1. 系统为 Darwin 24.6.0；
-2. 启动参数包含 `-pc711pcompat`；
-3. PCI 身份为 `1C5C:174A` 且 class 为 NVMe `01:08:02`；
-4. 请求一个 MSI-X 向量；
-5. 调用 Apple 原始实现创建事件源；
-6. 清除旧 MSI-X 路径选择位 `0x10`。
+1. 自动匹配 PCI 身份 `1C5C:174A` 和 NVMe class `01:08:02`；
+2. 请求一个 MSI-X 向量；
+3. 调用 Apple 原始实现创建事件源；
+4. 清除旧 MSI-X 路径选择位 `0x10`。
 
-Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成。其他设备和 Darwin 版本不会启用该兼容路由。
+Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成。其他 PCI ID 保持 Apple 原始行为。macOS 26 已原生支持实测 PC711，因此插件最高只加载到 Darwin 24。
 
 ## 4. 构建与验证
 
@@ -53,6 +51,6 @@ Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成�
 
 ## 5. 当前结论
 
-已证明 0.6.0 的组合补丁可在上述硬件与系统环境中消除第一条 Identify 超时，并发布控制器、namespace 和分区。
+已证明该组合补丁可在上述硬件与系统环境中消除第一条 Identify 超时，并发布控制器、namespace 和分区。
 
 尚未覆盖其他 macOS 15 build、其他固件或平台，以及 macOS 15 的完整安装、持续读写、TRIM 和睡眠唤醒。因此它是一个经过硬件验证的窄范围兼容补丁，不是通用 PC711 驱动。
