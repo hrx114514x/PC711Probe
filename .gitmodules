@@ -1,0 +1,6 @@
+[submodule "Vendor/Lilu"]
+	path = Vendor/Lilu
+	url = https://github.com/acidanthera/Lilu.git
+[submodule "Vendor/MacKernelSDK"]
+	path = Vendor/MacKernelSDK
+	url = https://github.com/acidanthera/MacKernelSDK.git
