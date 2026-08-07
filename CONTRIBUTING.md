@@ -7,9 +7,13 @@ Issues and pull requests are welcome, but this project deals with storage initia
 When reporting hardware results, include / 报告硬件结果时请提供：
 
 - exact macOS version, build, and Darwin version / macOS 版本、Build 与 Darwin 版本；
-- PCI vendor/device/class and the public model/firmware string / PCI 身份及公开型号、固件；
+- SSD model, capacity, and firmware / SSD 型号、容量与固件；
+- PCI vendor/device/class/revision and subsystem vendor/device / PCI Vendor、Device、Class、Revision 与 Subsystem 身份；
+- CPU and motherboard or computer model / CPU 与主板或整机型号；
 - OpenCore, Lilu, and PC711Probe versions / OpenCore、Lilu、PC711Probe 版本；
 - whether NVMeFix or an SSDT hide rule was active / 是否启用 NVMeFix 或隐藏设备的 SSDT；
+- separate Recovery, Installer, and installed-system results / Recovery、Installer 与已安装系统的分项结果；
+- sleep/wake count and any storage workload used / 睡眠唤醒次数与已执行的存储负载；
 - a sanitized panic excerpt or success criteria / 脱敏后的 panic 摘要或成功标准。
 
 Do not publish serial numbers, complete EFI folders, SMBIOS data, NVRAM dumps, credentials, or Apple proprietary binaries.

@@ -6,6 +6,9 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 
 > **New finding: PC711 works natively on macOS 26.** The same physical PC711 was identified by Apple `IONVMeFamily` on macOS 26.5.1 (25F80 / Darwin 25.5.0), with working I/O and sleep/wake. Neither PC711Probe nor NVMeFix was required. PC711Probe does not load on macOS 26.
 
+> [!IMPORTANT]
+> PC711Probe must match the controller before NVMe Identify makes the model string available. It therefore matches PCI `1C5C:174A` with NVMe class `01:08:02`, an identity also reported by SK hynix Gold P31 and BC711 devices. Only `SKHynix_HFS512GDE9X084N` with firmware `41010C22` has been hardware-validated. All other `1C5C:174A` devices remain untested and should be tried only with a rollback-capable EFI and a current data backup.
+
 > [!NOTE]
 > ## ❤️ Support PC711Probe
 >
@@ -15,7 +18,7 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 
 ## Verified result
 
-PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 11–14 were verified in Recovery, while macOS 15.6.1 completed a full installation and booted from the PC711. The former Identify/command timeout panic after roughly 75 seconds did not recur.
+PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 11–14 were verified in Recovery, while macOS 15.6.1 completed a full installation and booted from the PC711. The installed system was later updated to macOS 15.7.9 and passed the extended storage, sleep/wake, and reboot test described below. The former Identify/command timeout panic after roughly 75 seconds did not recur.
 
 ![PC711 running macOS 15.6.1 with TRIM, PCIe link details, and measured disk performance](docs/images/macos15-installed-performance.png)
 
@@ -26,6 +29,7 @@ PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 
 | Firmware | `41010C22` |
 | Recovery boot verified | macOS 11.6 (20G165), 12.5.1 (21G83), 13.4.1 (22F82), 14.6.1 (23G93) |
 | Full installation verified | macOS 15.6.1, build 24G90, Darwin 24.6.0 |
+| Extended validation | macOS 15.7.9, build 24G830: 96 GiB sequential write/read/hash, dual 8 GiB parallel I/O, 20,000 small files, 3 sleep/wake cycles, 3 reboots, and APFS verification |
 | macOS 15 link/status | PCIe 3.0 x4, 8.0 GT/s, TRIM: Yes, S.M.A.R.T.: Verified |
 | macOS 15 measured result | 2766.1 MB/s write, 3005.9 MB/s read (Blackmagic Disk Speed Test) |
 | Native OS | macOS 26.5.1, build 25F80, Darwin 25.5.0 |
@@ -33,12 +37,12 @@ PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 
 
 ## Automatic matching
 
-Version 1.7.0 requires no activation argument. Once enabled in OpenCore, it automatically patches only controllers matching:
+Version 1.7.0 requires no activation argument. Once enabled in OpenCore, it automatically patches controllers matching:
 
 - PCI Vendor/Device: `1C5C:174A`; and
 - NVMe class: `01:08:02`.
 
-The PC711 model string is not available until the first Identify succeeds, so the plugin uses its known PCI controller identity before that command. Different capacities and OEM model strings do not affect matching. NVMe controllers with other PCI IDs retain Apple's original behavior.
+The PC711 model string is not available until the first Identify succeeds, so the plugin uses the PCI controller identity before that command. This makes different capacities and OEM model strings possible, but it also means the plugin cannot distinguish the validated PC711 from untested P31 or BC711 devices that expose the same identity. NVMe controllers with other PCI IDs retain Apple's original behavior.
 
 The declared automatic range is Darwin 20–24 (macOS 11–15). The plugin does not load on Darwin 25/macOS 26, where the tested PC711 works natively.
 
@@ -84,7 +88,9 @@ Output: `build/Debug/PC711Probe.kext`
 
 ## Current validation boundary
 
-Recovery boot is verified on macOS 11–14. A complete macOS 15.6.1 installation, normal system boot, namespace/partition publication, PCIe 3.0 x4 link, reported TRIM support, S.M.A.R.T. status, and a 2766.1/3005.9 MB/s write/read benchmark are verified on the tested PC711. Sleep/wake on macOS 11–15, long-duration stress, other firmware revisions, and other platforms remain outside the current validation boundary. Keep a rollback EFI and data backup for the first test.
+Recovery boot is verified on macOS 11–14. A complete macOS 15.6.1 installation, normal system boot, namespace/partition publication, PCIe 3.0 x4 link, reported TRIM support, S.M.A.R.T. status, and a 2766.1/3005.9 MB/s write/read benchmark are verified on the tested PC711. On macOS 15.7.9, the same drive also passed 96 GiB of sequential write/read/two-pass SHA-256 validation, dual 8 GiB parallel I/O, 20,000 small-file operations, three sleep/wake cycles, three reboots, and APFS verification without a panic, NVMe timeout, I/O error, media loss, or hash mismatch.
+
+These results cover one physical `SKHynix_HFS512GDE9X084N`, firmware `41010C22`, on one AMD platform. Other PC711 capacities and firmware revisions, Intel platforms, and other `1C5C:174A` products remain untested. Keep a rollback EFI and data backup for the first test, and submit independent results through [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues).
 
 ## License
 

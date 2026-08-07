@@ -8,6 +8,7 @@
 - 首次验证使用独立 USB EFI，并保留另一个可启动 EFI。
 - 确保 Lilu 已安装且排在 PC711Probe 前面。
 - macOS 26 已可原生驱动 PC711，不需要加载本插件。
+- PC711Probe 会在 Identify 前匹配 PCI `1C5C:174A` 与 NVMe class `01:08:02`。Gold P31 和 BC711 也可能使用这一身份，但目前只验证了固件 `41010C22` 的 `SKHynix_HFS512GDE9X084N`。
 
 ## OpenCore 配置
 
@@ -22,12 +23,12 @@
    | MinKernel | `20.0.0` |
    | MaxKernel | `24.99.99` |
 
-3. 不要添加启用参数；1.7.0 会自动匹配 `1C5C:174A` PC711。
+3. 不要添加启用参数；1.7.0 会自动匹配 `1C5C:174A` 与 NVMe class `01:08:02`。
 4. 停用隐藏 PC711 的 AML/SSDT，包括 `_STA=0` 或伪造 class/vendor/device 的规则。
 5. 首次验证时暂时停用 NVMeFix，避免混淆结果。
 6. 使用与 OpenCore 版本匹配的 `ocvalidate` 检查配置。
 
-> 实测 PC711 已成功启动 macOS 11–14 Recovery，并完成 macOS 15.6.1 安装；其他固件版本和平台首次使用时仍需保留可回滚方案。
+> 实测 PC711 已成功启动 macOS 11–14 Recovery，完成 macOS 15.6.1 安装，并在 macOS 15.7.9 通过扩展 I/O、睡眠唤醒和重启验证；其他硬盘、固件版本和平台首次使用时仍需保留可回滚方案。
 
 ## 首次启动
 

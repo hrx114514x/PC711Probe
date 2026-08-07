@@ -1,0 +1,67 @@
+name: Bug report / 问题报告
+description: Report a reproducible PC711Probe problem / 报告可复现的 PC711Probe 问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not upload complete EFI folders, serial numbers, SMBIOS data, NVRAM dumps, credentials, or Apple proprietary binaries.
+
+        不要上传完整 EFI、序列号、SMBIOS 数据、NVRAM 转储、凭据或 Apple 专有二进制。
+  - type: input
+    id: hardware
+    attributes:
+      label: SSD and PCI identity / SSD 与 PCI 身份
+      description: Model, capacity, firmware, vendor/device/class/revision, and subsystem IDs / 型号、容量、固件、Vendor/Device/Class/Revision 和 Subsystem ID
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform / 平台
+      description: CPU and motherboard or computer model / CPU 与主板或整机型号
+    validations:
+      required: true
+  - type: input
+    id: software
+    attributes:
+      label: Software versions / 软件版本
+      description: macOS version/build/Darwin plus OpenCore, Lilu, PC711Probe, and NVMeFix status / macOS 版本/Build/Darwin、OpenCore、Lilu、PC711Probe 以及 NVMeFix 状态
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Failure stage / 失败阶段
+      options:
+        - Recovery
+        - macOS Installer
+        - Installed-system boot / 已安装系统启动
+        - Normal I/O / 正常读写
+        - Sleep or wake / 睡眠或唤醒
+        - Shutdown or reboot / 关机或重启
+        - Other / 其他
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps / 复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized panic or logs / 脱敏后的 panic 或日志
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation / 确认
+      options:
+        - label: The PC711 is not hidden by AML/SSDT or spoofed PCI properties. / PC711 没有被 AML/SSDT 或伪造 PCI 属性隐藏。
+          required: true
+        - label: I removed private information from all attachments. / 我已从所有附件中删除隐私信息。
+          required: true
