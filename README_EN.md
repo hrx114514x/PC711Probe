@@ -2,100 +2,67 @@
 
 English | [简体中文](README.md)
 
-An experimental Lilu plugin that fixes an `IONVMeFamily` Identify-timeout kernel panic affecting an SK hynix PC711 on a specific Hackintosh platform running macOS 15.6.1.
+An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-timeout kernel panic affecting the SK hynix PC711 on older macOS releases.
 
-> This is not a generic NVMe driver. It contains a narrowly scoped compatibility patch tied to Darwin 24.6 internals and a private controller offset. Back up your data and validate it from a rollback-capable test EFI first.
+> **New finding: PC711 works natively on macOS 26.** The same physical PC711 was identified by Apple `IONVMeFamily` on macOS 26.5.1 (25F80 / Darwin 25.5.0), with working I/O and sleep/wake. Neither PC711Probe nor NVMeFix was required. PC711Probe does not load on macOS 26.
 
 ## Verified result
 
-`PC711Probe 0.6.0` completed one hardware boot into macOS 15.6.1 Recovery (24G90 / Darwin 24.6.0). Disk Utility opened, the PC711 model and all five existing partitions were enumerated, and the former first-Identify panic after roughly 75 seconds did not recur.
+The interrupt compatibility patch was hardware-tested with macOS 15.6.1 Recovery (24G90 / Darwin 24.6.0). Disk Utility opened, the PC711 model and all five existing partitions were enumerated, and the former first-Identify timeout panic after roughly 75 seconds did not recur.
 
 ![PC711 enumerated in macOS 15.6.1 Recovery](docs/images/recovery-success.jpg)
-
-Verified environment:
 
 | Item | Verified value |
 |---|---|
 | Controller | SK hynix `1C5C:174A`, NVMe class `01:08:02` |
-| Device model | `SKHynix_HFS512GDE9X084N` (PC711) |
+| Model | `SKHynix_HFS512GDE9X084N` (PC711) |
 | Firmware | `41010C22` |
-| PCI path | AMD platform, `GPP3/NVME` |
 | Failing OS | macOS 15.6.1, build 24G90, Darwin 24.6.0 |
-| Reference OS | macOS 26.5.1, build 25F80, Darwin 25.5.0 |
+| Native OS | macOS 26.5.1, build 25F80, Darwin 25.5.0 |
 | Boot environment | OpenCore 1.0.8, Lilu 1.7.3 |
 
-The verified boundary covers controller initialization, Identify, namespace discovery, and IOMedia/partition publication. A full macOS 15 installation, sustained I/O, TRIM, sleep/wake, other firmware, and other platforms remain untested.
+## Automatic matching
 
-## Symptom
+Version 1.0.0 requires no `-pc711pcompat` or other activation argument. Once enabled in OpenCore, it automatically patches only controllers matching:
 
-Without the patch, macOS 15.6.1 panics about 75 seconds after its first Identify Controller command:
+- PCI Vendor/Device: `1C5C:174A`; and
+- NVMe class: `01:08:02`.
 
-```text
-nvme: Command timeout. Identify.
-MODEL=Model string not available
-FW=FW Revision not available
-CSTS=0x1 VID=0x1c5c DID=0x174a
-```
+The PC711 model string is not available until the first Identify succeeds, so the plugin uses its known PCI controller identity before that command. Different capacities and OEM model strings do not affect matching. NVMe controllers with other PCI IDs retain Apple's original behavior.
 
-The same hardware and OpenCore configuration initialize natively through Apple `IONVMeFamily` on macOS 26.5.1, including working I/O and sleep/wake. This narrowed the fault to a version-specific NVMe initialization and interrupt-path difference.
+The declared automatic range is Darwin 8–24 (macOS 10.4–15); the route is installed when the corresponding `IONVMeFamily` symbol exists. The plugin does not load on Darwin 25/macOS 26.
 
 ## How it works
 
-Symbol and machine-code comparison of the two real `BootKernelExtensions.kc` files showed that:
+On macOS 15.6.1, the PC711 controller reaches Ready state (`CSTS=1`), but the first Identify Controller command never returns through the older interrupt completion path and eventually panics.
 
-1. Darwin 25 added this operation to `IONVMeController::CreateDeviceInterrupt` before interrupt-source enumeration:
+Comparison of Apple `IONVMeFamily` between macOS 15 and macOS 26 showed that the newer OS requests one MSI-X vector before creating the interrupt source and removes an older MSI-X-specific path. For the matched PC711, PC711Probe:
 
-   ```cpp
-   IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0);
-   ```
+1. calls `IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0)`;
+2. calls Apple's original `CreateDeviceInterrupt`;
+3. clears the old interrupt-path selector; and
+4. leaves Identify, queues, namespaces, and storage I/O to Apple's driver.
 
-   `0x20000` requests MSI-X.
-
-2. Darwin 24 still contains an older special MSI-X branch in `FilterInterruptRequest` / `HandleInterruptRequest`. Darwin 25 removed that branch and consistently uses the normal event-source path.
-
-With Darwin 24.6.0, `-pc711pcompat`, and an exact PCI identity match, `PC711Probe 0.6.0`:
-
-- routes Apple's `CreateDeviceInterrupt`;
-- requests one MSI-X vector;
-- calls the original Apple function to create the event source;
-- clears bit `0x10` at Darwin 24 controller offset `0x191`, selecting the normal event-source path; and
-- leaves Identify, queue management, completion parsing, namespaces, and storage I/O in Apple code.
-
-See [docs/DEVELOPMENT.en.md](docs/DEVELOPMENT.en.md) for the evidence-driven development process.
-
-## Compatibility scope
-
-The compatibility route requires all of the following internally:
-
-- Darwin `24.6.0`;
-- boot argument `-pc711pcompat`;
-- PCI Vendor/Device `1C5C:174A`; and
-- NVMe class/revision mask result `01:08:02`.
-
-The route remains inactive on other Darwin versions and nonmatching devices.
-
-SK hynix may reuse the same PCI ID across multiple OEM models. Anything outside the verified table must be treated as untested, even when its ID matches.
+[Read the concise development process](docs/DEVELOPMENT.en.md)
 
 ## Installation
 
-Read the [English installation and rollback guide](docs/INSTALL.en.md) first. The minimum OpenCore setup is:
-
-1. Load Lilu before PC711Probe.
-2. Copy `PC711Probe.kext` to `EFI/OC/Kexts`.
-3. Enable it under `Kernel -> Add` with:
+1. Back up the current EFI and start with a rollback-capable test USB.
+2. Ensure Lilu loads before PC711Probe.
+3. Copy `PC711Probe.kext` to `EFI/OC/Kexts` and add it under `Kernel -> Add`:
    - `BundlePath`: `PC711Probe.kext`
    - `ExecutablePath`: `Contents/MacOS/PC711Probe`
    - `PlistPath`: `Contents/Info.plist`
-   - `MinKernel`: `24.0.0`
+   - `MinKernel`: `8.0.0`
    - `MaxKernel`: `24.99.99`
-4. Add `-pc711pcompat` to `boot-args`.
-5. For the first isolated test, disable NVMeFix and any SSDT that hides the target NVMe through `_STA=0` or an equivalent method.
+4. Disable AML/SSDT code that hides the PC711 through `_STA=0` or spoofed class/vendor/device values.
+5. Do not add a PC711Probe activation boot argument.
 
-Add `-pc711pdbg` only when debug logging is needed.
+Use `-pc711poff` only as an emergency disable switch. Use `-pc711pdbg` for debug logging.
 
-## Building
+[Full English installation and rollback guide](docs/INSTALL.en.md)
 
-macOS, Apple Command Line Tools, and Git are required:
+## Build
 
 ```bash
 git clone --recurse-submodules https://github.com/hrx114514x/PC711Probe.git
@@ -103,21 +70,10 @@ cd PC711Probe
 ./Scripts/verify.sh
 ```
 
-The result is `build/Debug/PC711Probe.kext`. The Lilu and MacKernelSDK dependencies are pinned as Git submodules.
+Output: `build/Debug/PC711Probe.kext`
 
-## Safety boundary
+## Current validation boundary
 
-- Perform the first test from a separate USB EFI and keep a known-good rollback EFI.
-- Do not erase or modify existing partitions in Recovery merely to test this plugin.
-- Do not combine it with AML/SSDT code that hides the PC711.
-- This is a version-specific patch using a private Apple object layout. Never assume an OS update is compatible.
-- You accept the risk of data loss, boot failure, and kernel panic.
+Controller initialization, Identify, namespace discovery, and partition publication are verified. A full macOS 15 installation, sustained I/O, TRIM, sleep/wake, other firmware, and other platforms have not yet completed hardware validation. Keep a rollback EFI and data backup for the first test.
 
-## License and credits
-
-Project code is licensed under [BSD 3-Clause](LICENSE).
-
-- [Lilu](https://github.com/acidanthera/Lilu) — plugin and routing framework
-- [MacKernelSDK](https://github.com/acidanthera/MacKernelSDK) — kernel extension build SDK
-
-Third-party dependencies retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This repository does not redistribute Apple Kernel Collections or the `IONVMeFamily` binary.
+This project is licensed under [BSD 3-Clause](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependencies. No Apple Kernel Collection or `IONVMeFamily` binary is redistributed.

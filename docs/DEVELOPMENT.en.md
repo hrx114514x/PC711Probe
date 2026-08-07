@@ -2,7 +2,7 @@
 
 English | [简体中文](DEVELOPMENT.zh-CN.md)
 
-PC711Probe 0.6.0 followed a direct path: reproduce the fault, use the newer OS as a reference, locate the relevant change, implement the smallest patch, and validate it on hardware.
+PC711Probe followed a direct path: reproduce the fault, use the newer OS as a reference, locate the relevant change, implement the smallest patch, and validate it on hardware.
 
 ## 1. Reproduce and bound the fault
 
@@ -29,16 +29,14 @@ IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0);
 
 ## 3. Implement the minimal compatibility patch
 
-PC711Probe uses Lilu to route only `CreateDeviceInterrupt` and applies strict activation conditions:
+PC711Probe uses Lilu to route only `CreateDeviceInterrupt`:
 
-1. the OS is Darwin 24.6.0;
-2. `-pc711pcompat` is present in boot arguments;
-3. the PCI identity is `1C5C:174A` with NVMe class `01:08:02`;
-4. one MSI-X vector is requested;
-5. Apple's original implementation creates the event source; and
-6. the old MSI-X path-selector bit `0x10` is cleared.
+1. PCI identity `1C5C:174A` with NVMe class `01:08:02` is matched automatically;
+2. one MSI-X vector is requested;
+3. Apple's original implementation creates the event source; and
+4. the old MSI-X path-selector bit `0x10` is cleared.
 
-Identify, queues, namespaces, and storage I/O remain handled by Apple `IONVMeFamily`. The compatibility route stays inactive for other devices and Darwin versions.
+Identify, queues, namespaces, and storage I/O remain handled by Apple `IONVMeFamily`. Other PCI IDs retain Apple's original behavior. The tested PC711 works natively on macOS 26, so the plugin loads only through Darwin 24.
 
 ## 4. Build and validate
 
@@ -53,6 +51,6 @@ No existing PC711 partition was erased or modified during validation, and the re
 
 ## 5. Current conclusion
 
-The combined 0.6.0 patch removes the first-Identify timeout and publishes the controller, namespace, and partitions in the verified hardware and OS environment.
+The combined patch removes the first-Identify timeout and publishes the controller, namespace, and partitions in the verified hardware and OS environment.
 
 Other macOS 15 builds, firmware revisions, and platforms remain untested, as do a full macOS 15 installation, sustained I/O, TRIM, and sleep/wake. PC711Probe is therefore a narrowly scoped, hardware-verified compatibility patch rather than a generic PC711 driver.

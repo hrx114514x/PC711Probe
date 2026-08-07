@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 — 2026-08-07
+
+- Enabled automatic operation without `-pc711pcompat`.
+- Kept matching limited to SK hynix `1C5C:174A` with NVMe class `01:08:02`.
+- Excluded Darwin 25/macOS 26, where the tested PC711 works natively.
+- Removed the public diagnostic stages and read-only probe paths.
+- Added concise Chinese and English installation guidance for the automatic build.
+
 ## 0.6.0 — 2026-08-06
 
 - Added Darwin 24.6 PC711 interrupt compatibility mode via `-pc711pcompat`.
