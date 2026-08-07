@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.0 — 2026-08-07
+
+- Added a Big Sur-compatible direct MSI-to-MSI-X reallocation path while keeping a single Kext loadable on macOS 11–15.
+- Moved the MSI-X request to early PCI matching on every supported release so Recovery and second-stage Installer polled commands are covered.
+- Retained the macOS 14–15 interrupt-source route as a fallback.
+- Hardware-validated macOS 11–14 Recovery and a complete macOS 15.6.1 installation.
+- Verified PCIe x4 / 8.0 GT/s, TRIM support, S.M.A.R.T. status, and 2766.1/3005.9 MB/s measured sequential write/read performance on the tested PC711.
+
 ## 1.2.0 — 2026-08-07
 
 - Added early, PC711-only MSI-X allocation for Darwin 20–22 without taking ownership away from Apple `IONVMeFamily`.

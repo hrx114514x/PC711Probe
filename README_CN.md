@@ -15,43 +15,43 @@
 
 ## 已验证结果
 
-PC711Probe 已在同一块 PC711 上通过 macOS 13.4.1 与 macOS 15.6.1 Recovery 硬件启动验证：系统进入磁盘工具，型号及五个既有分区全部被枚举，原先约 75 秒后的 NVMe 命令超时 KP 不再出现。macOS 11.6 目前仍会 KP，尚未支持。
+PC711Probe 1.7.0 已让同一块实机 PC711 在 macOS 11–15 全部成功启动：macOS 11–14 完成 Recovery 验证，macOS 15.6.1 完成完整安装并从 PC711 进入系统。原先约 75 秒后的 Identify/命令超时 KP 不再出现。
 
-![macOS 15.6.1 Recovery 中识别 PC711](docs/images/recovery-success.jpg)
+![PC711 运行 macOS 15.6.1，并显示 TRIM、PCIe 链路和实测磁盘性能](docs/images/macos15-installed-performance.png)
 
 | 项目 | 已验证值 |
 |---|---|
 | 控制器 | SK hynix `1C5C:174A`，NVMe class `01:08:02` |
 | 型号 | `SKHynix_HFS512GDE9X084N`（PC711） |
 | 固件 | `41010C22` |
-| v1.2.0 验证成功 | macOS 13.4.1，Build 22F82，Darwin 22.5.0 |
-| 既有验证成功 | macOS 15.6.1，Build 24G90，Darwin 24.6.0 |
-| 本机启动正常 | macOS 12.5.1（21G83）、macOS 14.6.1（23G93）Recovery |
-| 当前未支持 | macOS 11.6（20G165），仍发生原始 NVMe 超时 KP |
+| Recovery 启动验证 | macOS 11.6（20G165）、12.5.1（21G83）、13.4.1（22F82）、14.6.1（23G93） |
+| 完整安装验证 | macOS 15.6.1，Build 24G90，Darwin 24.6.0 |
+| macOS 15 链路/状态 | PCIe 3.0 x4、8.0 GT/s、TRIM：是、S.M.A.R.T.：已验证 |
+| macOS 15 实测成绩 | 写入 2766.1 MB/s、读取 3005.9 MB/s（Blackmagic Disk Speed Test） |
 | 原生系统 | macOS 26.5.1，Build 25F80，Darwin 25.5.0 |
 | 引导环境 | OpenCore 1.0.8，Lilu 1.7.3 |
 
 ## 自动匹配范围
 
-1.2.0 不需要任何启用参数。Kext 加入 OpenCore 后自动运行，只对以下控制器应用补丁：
+1.7.0 不需要任何启用参数。Kext 加入 OpenCore 后自动运行，只对以下控制器应用补丁：
 
 - PCI Vendor/Device：`1C5C:174A`；
 - NVMe class：`01:08:02`。
 
 PC711 的型号字符串必须等第一次 Identify 成功后才能读取，因此插件使用其已知 PCI 控制器 ID 进行预先匹配；不同容量和 OEM 型号不依赖字符串判断。其他 PCI ID 的 NVMe 保持 Apple 原始行为。
 
-插件声明的自动运行范围为 Darwin 20–24（macOS 11–15）。Darwin 25/macOS 26 不加载插件。macOS 11 虽在加载范围内，但目前实测仍会 KP。
+插件声明的自动运行范围为 Darwin 20–24（macOS 11–15）。Darwin 25/macOS 26 不加载插件，实测 PC711 在该系统已原生免驱。
 
 ## 原理
 
-macOS 15.6.1 中，PC711 控制器已经 Ready（`CSTS=1`），但第一条 Identify Controller 命令无法通过旧中断完成路径返回，最终超时 KP。
+没有补丁时，PC711 控制器已经 Ready（`CSTS=1`），但 Identify 或其他早期 NVMe 命令可能无法通过旧中断路径完成，约 75 秒后触发超时 KP。
 
 对比旧版与 macOS 26 的 Apple `IONVMeFamily` 后发现，新系统会在创建中断源前请求一个 MSI-X 向量，并移除了旧 MSI-X 特殊路径。PC711Probe 对匹配的 PC711：
 
-1. 在 macOS 11–13 的 PCI 匹配早期请求一个 MSI-X 向量，随后主动放弃设备绑定；
-2. Apple `IONVMeFamily` 继续作为真正的 NVMe 驱动接管设备；
-3. 在 macOS 14–15 创建中断源时请求 MSI-X，并清除旧中断路径选择位；
-4. 其余 Identify、队列、namespace 和存储 I/O 继续由 Apple 驱动完成。
+1. 在 macOS 11–15 的 PCI 匹配早期请求 MSI-X，早于 Recovery 或 Installer 的敏感轮询命令；
+2. macOS 11 使用 Big Sur 原始 PCI 消息中断分配器，macOS 12–15 使用 `IOPCIDevice::configureInterrupts`；
+3. 保留中断源兼容路由作为后备，并在 macOS 14–15 清除旧路径选择位；
+4. 随后主动放弃设备绑定，Identify、队列、namespace 和全部存储 I/O 仍由 Apple `IONVMeFamily` 完成。
 
 [查看简明开发过程](docs/DEVELOPMENT.zh-CN.md)
 
@@ -84,7 +84,7 @@ cd PC711Probe
 
 ## 当前验证边界
 
-已验证 macOS 13/15 Recovery 中的控制器初始化、Identify、namespace 和分区发布；macOS 12/14 Recovery 在本机启动正常。macOS 11 尚未修复，完整安装、持续读写、TRIM、睡眠唤醒，以及其他固件和平台也未完成硬件验证。首次使用请保留回滚 EFI 和数据备份。
+macOS 11–14 Recovery 已通过启动验证；macOS 15.6.1 已完成完整安装、正常进入系统、namespace/分区发布、PCIe 3.0 x4 链路、TRIM 支持与 S.M.A.R.T. 状态确认，并实测写入 2766.1 MB/s、读取 3005.9 MB/s。macOS 11–15 的睡眠唤醒、长时间压力测试、其他固件版本和其他平台仍不在当前验证范围内。首次使用请保留回滚 EFI 和数据备份。
 
 ## 许可
 
