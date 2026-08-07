@@ -2,8 +2,11 @@
 
 #include <IOKit/IOService.h>
 #include <IOKit/IOFilterInterruptEventSource.h>
+#include <IOKit/IOPlatformExpert.h>
 #include <IOKit/pci/IOPCIDevice.h>
 #include <IOKit/pci/IOPCIFamilyDefinitions.h>
+#include <libkern/c++/OSArray.h>
+#include <libkern/c++/OSSymbol.h>
 
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_patcher.hpp>
@@ -20,10 +23,62 @@ constexpr uint32_t kInterruptTypeMSIX {0x00020000U};
 constexpr size_t kConfigureInterruptsVtableSlot {0x960 / sizeof(uintptr_t)};
 constexpr size_t kControllerFlagsOffset {0x191};
 constexpr uint8_t kLegacyMSIXPathFlag {0x10};
+constexpr uint8_t kBigSurMSIXMode {0x01};
+
+constexpr const char *kAllocateDeviceInterruptsSymbol {
+	"__ZN32IOPCIMessagedInterruptController24allocateDeviceInterruptsEP9IOServicejjPyPj"
+};
+constexpr const char *kDeallocateDeviceInterruptsSymbol {
+	"__ZN32IOPCIMessagedInterruptController26deallocateDeviceInterruptsEP9IOService"
+};
 
 using ConfigureInterrupts = IOReturn (*)(IOPCIDevice *device,
 	uint32_t interruptType, uint32_t numRequired, uint32_t numRequested,
 	IOOptionBits options);
+using AllocateDeviceInterrupts = IOReturn (*)(void *controller,
+	IOService *device, uint32_t numVectors, uint32_t msiCapability,
+	uint64_t *msiAddress, uint32_t *msiData);
+using DeallocateDeviceInterrupts = IOReturn (*)(void *controller,
+	IOService *device);
+
+AllocateDeviceInterrupts bigSurAllocateDeviceInterrupts {nullptr};
+DeallocateDeviceInterrupts bigSurDeallocateDeviceInterrupts {nullptr};
+
+// Big Sur exports the five-argument allocator. Monterey and newer changed
+// its C++ signature, so weak linkage keeps one binary loadable across 11-15.
+extern "C" IOReturn directBigSurAllocateDeviceInterrupts(void *controller,
+	IOService *device, uint32_t numVectors, uint32_t msiCapability,
+	uint64_t *msiAddress, uint32_t *msiData)
+	__asm("__ZN32IOPCIMessagedInterruptController24allocateDeviceInterruptsEP9IOServicejjPyPj")
+	__attribute__((weak_import));
+extern "C" IOReturn directBigSurDeallocateDeviceInterrupts(void *controller,
+	IOService *device)
+	__asm("__ZN32IOPCIMessagedInterruptController26deallocateDeviceInterruptsEP9IOService")
+	__attribute__((weak_import));
+
+struct BigSurPCIMSIState {
+	uint8_t reserved0[28];
+	uint16_t msiCapability;
+	uint16_t msiControl;
+	uint16_t msiPhysVectorCount;
+	uint16_t msiVectorCount;
+	uint8_t msiMode;
+	uint8_t msiEnable;
+	uint8_t reserved1[2];
+	uint64_t msiTable;
+	uint64_t msiPBA;
+	void *msiVectors;
+};
+
+static_assert(offsetof(BigSurPCIMSIState, msiCapability) == 28,
+	"unexpected Big Sur PCI MSI state layout");
+static_assert(offsetof(BigSurPCIMSIState, msiTable) == 40,
+	"unexpected Big Sur PCI MSI table layout");
+
+class PC711PCIDeviceAccess : public IOPCIDevice {
+public:
+	void *compatReserved() { return reserved; }
+};
 
 bool isPC711Device(IOPCIDevice *pci) {
 	if (!pci)
@@ -50,11 +105,119 @@ IOReturn configurePC711MSIX(IOPCIDevice *pci) {
 		kIOReturnUnsupported;
 }
 
+IOReturn reallocateBigSurPC711MSIX(IOPCIDevice *pci) {
+	if (pci && pci->getProperty("PC711CompatBigSurMSIXReallocated"))
+		return kIOReturnSuccess;
+
+	auto allocate = bigSurAllocateDeviceInterrupts ?
+		bigSurAllocateDeviceInterrupts : directBigSurAllocateDeviceInterrupts;
+	auto deallocate = bigSurDeallocateDeviceInterrupts ?
+		bigSurDeallocateDeviceInterrupts : directBigSurDeallocateDeviceInterrupts;
+	if (!pci || !allocate || !deallocate)
+		return kIOReturnNotReady;
+
+	IOByteCount msixCapability {0};
+	pci->extendedFindPCICapability(kIOPCIMSIXCapability, &msixCapability);
+	if (!msixCapability)
+		return kIOReturnUnsupported;
+
+	auto controllers = OSDynamicCast(OSArray,
+		pci->getProperty(gIOInterruptControllersKey));
+	auto specifiers = OSDynamicCast(OSArray,
+		pci->getProperty(gIOInterruptSpecifiersKey));
+	if (!controllers || !specifiers ||
+		controllers->getCount() != specifiers->getCount())
+		return kIOReturnNotReady;
+
+	void *messagedController {nullptr};
+	const OSSymbol *messagedName {nullptr};
+	for (unsigned int index = 0; index < controllers->getCount(); index++) {
+		auto name = OSDynamicCast(OSSymbol, controllers->getObject(index));
+		if (!name)
+			continue;
+		auto controller = IOService::getPlatform()->lookUpInterruptController(name);
+		if (controller && controller->metaCast("IOPCIMessagedInterruptController")) {
+			messagedController = controller;
+			messagedName = name;
+			break;
+		}
+	}
+	if (!messagedController || !messagedName)
+		return kIOReturnNotReady;
+
+	auto state = reinterpret_cast<BigSurPCIMSIState *>(
+		reinterpret_cast<PC711PCIDeviceAccess *>(pci)->compatReserved());
+	if (!state || !state->msiCapability)
+		return kIOReturnNotReady;
+
+	const uint16_t oldCapability = state->msiCapability;
+	const uint8_t oldMode = state->msiMode;
+	const auto deallocateResult = deallocate(messagedController, pci);
+	if (deallocateResult != kIOReturnSuccess)
+		return deallocateResult;
+
+	auto retainedControllers = OSArray::withCapacity(controllers->getCount());
+	auto retainedSpecifiers = OSArray::withCapacity(specifiers->getCount());
+	if (!retainedControllers || !retainedSpecifiers) {
+		OSSafeReleaseNULL(retainedControllers);
+		OSSafeReleaseNULL(retainedSpecifiers);
+		return kIOReturnNoMemory;
+	}
+
+	for (unsigned int index = 0; index < controllers->getCount(); index++) {
+		auto controllerName = controllers->getObject(index);
+		auto specifier = specifiers->getObject(index);
+		if (!controllerName || !specifier || controllerName->isEqualTo(messagedName))
+			continue;
+		retainedControllers->setObject(controllerName);
+		retainedSpecifiers->setObject(specifier);
+	}
+	pci->setProperty(gIOInterruptControllersKey, retainedControllers);
+	pci->setProperty(gIOInterruptSpecifiersKey, retainedSpecifiers);
+	retainedControllers->release();
+	retainedSpecifiers->release();
+
+	state->msiCapability = static_cast<uint16_t>(msixCapability);
+	state->msiControl = 0;
+	state->msiPhysVectorCount = 0;
+	state->msiVectorCount = 0;
+	state->msiMode = kBigSurMSIXMode;
+	state->msiEnable = 0;
+	state->msiTable = 0;
+	state->msiPBA = 0;
+	state->msiVectors = nullptr;
+
+	const auto allocateResult = allocate(
+		messagedController, pci, 0, static_cast<uint32_t>(msixCapability),
+		nullptr, nullptr);
+	pci->setProperty("PC711CompatBigSurMSIXReallocationResult",
+		static_cast<unsigned long long>(static_cast<uint32_t>(allocateResult)), 32);
+	if (allocateResult == kIOReturnSuccess) {
+		pci->setProperty("PC711CompatBigSurMSIXReallocated", true);
+		return allocateResult;
+	}
+
+	// Restore the original MSI allocation if MSI-X allocation failed.
+	state->msiCapability = oldCapability;
+	state->msiControl = 0;
+	state->msiPhysVectorCount = 0;
+	state->msiVectorCount = 0;
+	state->msiMode = oldMode;
+	state->msiEnable = 0;
+	state->msiTable = 0;
+	state->msiPBA = 0;
+	state->msiVectors = nullptr;
+	allocate(messagedController, pci, 0, oldCapability,
+		nullptr, nullptr);
+	return allocateResult;
+}
+
 } // namespace
 
-// Darwin 20-22 may have resolved a different PCI interrupt allocation before
-// IONVMeFamily creates its event source. Request MSI-X while the PC711 PCI nub
-// is still being probed, then decline attachment so Apple's driver takes over.
+// Recovery and installer environments may issue polled NVMe commands before
+// IONVMeFamily creates its ordinary event source. Request MSI-X while the
+// PC711 PCI nub is still being probed, then decline attachment so Apple's
+// driver takes over on every supported macOS release.
 class PC711EarlyMSIX : public IOService {
 	OSDeclareDefaultStructors(PC711EarlyMSIX)
 
@@ -65,14 +228,12 @@ public:
 OSDefineMetaClassAndStructors(PC711EarlyMSIX, IOService)
 
 IOService *PC711EarlyMSIX::probe(IOService *provider, SInt32 *) {
-	if (getKernelVersion() > KernelVersion::Ventura)
-		return nullptr;
-
 	auto pci = OSDynamicCast(IOPCIDevice, provider);
 	if (!isPC711Device(pci))
 		return nullptr;
 
-	const auto result = configurePC711MSIX(pci);
+	const auto result = getKernelVersion() == KernelVersion::BigSur ?
+		reallocateBigSurPC711MSIX(pci) : configurePC711MSIX(pci);
 	pci->setProperty("PC711CompatEarlyMSIXRequested", true);
 	pci->setProperty("PC711CompatEarlyConfigureInterruptsResult",
 		static_cast<unsigned long long>(static_cast<uint32_t>(result)), 32);
@@ -110,6 +271,8 @@ private:
 		IOService *provider);
 	static void processKext(void *context, KernelPatcher &patcher, size_t index,
 		mach_vm_address_t address, size_t size);
+	static void processPCIKext(void *context, KernelPatcher &patcher, size_t index,
+		mach_vm_address_t address, size_t size);
 	static IOFilterInterruptEventSource *wrapCreateDeviceInterrupt(void *controller,
 		IOInterruptEventAction action, IOFilterInterruptAction filter,
 		IOService *provider);
@@ -124,6 +287,19 @@ private:
 	KernelPatcher::KextInfo kextInfo {
 		"com.apple.iokit.IONVMeFamily",
 		&kextPath,
+		1,
+		{true},
+		{},
+		KernelPatcher::KextInfo::Unloaded
+	};
+
+	const char *pciKextPath {
+		"/System/Library/Extensions/IOPCIFamily.kext/Contents/MacOS/IOPCIFamily"
+	};
+
+	KernelPatcher::KextInfo pciKextInfo {
+		"com.apple.iokit.IOPCIFamily",
+		&pciKextPath,
 		1,
 		{true},
 		{},
@@ -162,7 +338,11 @@ IOFilterInterruptEventSource *PC711ProbePlugin::wrapCreateDeviceInterrupt(
 				filter, provider) : nullptr;
 	}
 
-	const auto result = configurePC711MSIX(pci);
+	// On Big Sur the IOPCIFamily callback may not have resolved the private MSI
+	// allocator when the high-score PCI personality probes. Retry here, after
+	// IOPCIFamily is ready but before IONVMeFamily creates its event source.
+	const auto result = getKernelVersion() == KernelVersion::BigSur ?
+		reallocateBigSurPC711MSIX(pci) : configurePC711MSIX(pci);
 	pci->setProperty("PC711CompatMSIXRequested", true);
 	pci->setProperty("PC711CompatConfigureInterruptsResult",
 		static_cast<unsigned long long>(static_cast<uint32_t>(result)), 32);
@@ -190,6 +370,25 @@ IOFilterInterruptEventSource *PC711ProbePlugin::wrapCreateDeviceInterrupt(
 		static_cast<uint32_t>(result), flagsBefore, flagsAfter,
 		eventSource != nullptr);
 	return eventSource;
+}
+
+void PC711ProbePlugin::processPCIKext(void *context, KernelPatcher &patcher,
+		size_t index, mach_vm_address_t, size_t) {
+	auto instance = static_cast<PC711ProbePlugin *>(context);
+	if (!instance || index != instance->pciKextInfo.loadIndex ||
+		getKernelVersion() != KernelVersion::BigSur)
+		return;
+
+	bigSurAllocateDeviceInterrupts = reinterpret_cast<AllocateDeviceInterrupts>(
+		patcher.solveSymbol(index, kAllocateDeviceInterruptsSymbol));
+	bigSurDeallocateDeviceInterrupts = reinterpret_cast<DeallocateDeviceInterrupts>(
+		patcher.solveSymbol(index, kDeallocateDeviceInterruptsSymbol));
+	if (!bigSurAllocateDeviceInterrupts || !bigSurDeallocateDeviceInterrupts) {
+		SYSLOG("probe", "failed to resolve Big Sur MSI reallocation functions");
+		return;
+	}
+
+	SYSLOG("probe", "Big Sur PC711 MSI-X reallocation functions ready");
 }
 
 void PC711ProbePlugin::processKext(void *context, KernelPatcher &patcher,
@@ -228,6 +427,10 @@ void PC711ProbePlugin::init() {
 	const auto error = lilu.onKextLoad(&kextInfo, 1, processKext, this);
 	if (error != LiluAPI::Error::NoError)
 		SYSLOG("probe", "failed to register IONVMeFamily load callback: %d", error);
+
+	const auto pciError = lilu.onKextLoad(&pciKextInfo, 1, processPCIKext, this);
+	if (pciError != LiluAPI::Error::NoError)
+		SYSLOG("probe", "failed to register IOPCIFamily load callback: %d", pciError);
 }
 
 const char *bootargOff[] {"-pc711poff"};

@@ -22,18 +22,18 @@ English | [简体中文](INSTALL.zh-CN.md)
    | MinKernel | `20.0.0` |
    | MaxKernel | `24.99.99` |
 
-3. Do not add an activation argument; version 1.2.0 automatically matches the `1C5C:174A` PC711.
+3. Do not add an activation argument; version 1.7.0 automatically matches the `1C5C:174A` PC711.
 4. Disable AML/SSDT code that hides the PC711 through `_STA=0` or spoofed class/vendor/device values.
 5. Temporarily disable NVMeFix for the first test so results are not mixed.
 6. Validate the configuration with the `ocvalidate` matching the OpenCore version.
 
-> macOS 11 is within the kext load range, but the tested machine still hits the original NVMe timeout panic and must not be considered supported yet.
+> The tested PC711 has booted macOS 11–14 Recovery and completed a macOS 15.6.1 installation. Other firmware revisions and platforms still require a rollback-capable first test.
 
 ## First boot
 
 1. Boot the older macOS release or Recovery through the test USB.
 2. Confirm that the desktop or Disk Utility opens.
-3. Check only that the PC711 model and existing partitions appear; do not erase or write to the drive.
+3. For a read-only first test, check that the PC711 model and existing partitions appear before installing or writing data.
 4. Confirm that other NVMe devices remain functional.
 
 ## Rollback

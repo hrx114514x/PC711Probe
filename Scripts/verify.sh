@@ -10,7 +10,7 @@ license="$project_dir/LICENSE"
 "$project_dir/Scripts/build.sh"
 
 plutil -lint "$plist"
-test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" = "1.2.0"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" = "1.7.0"
 test "$(/usr/libexec/PlistBuddy -c 'Print :OSBundleLibraries:com.apple.iokit.IOPCIFamily' "$plist")" = "2.9"
 file "$binary" | grep -q "Mach-O 64-bit kext bundle x86_64"
 nm -g "$binary" | grep -q ' _kmod_info$'
@@ -35,6 +35,11 @@ grep -q 'configure(pci, kInterruptTypeMSIX, 1, 1, 0)' "$source"
 grep -q 'class PC711EarlyMSIX' "$source"
 grep -q 'PC711CompatEarlyMSIXRequested' "$source"
 grep -q '0x174A1C5C' "$plist"
+grep -q 'reallocateBigSurPC711MSIX' "$source"
+grep -q 'PC711CompatBigSurMSIXReallocated' "$source"
+grep -q 'PC711CompatBigSurMSIXReallocationResult' "$source"
+grep -q 'kAllocateDeviceInterruptsSymbol' "$source"
+grep -q 'kDeallocateDeviceInterruptsSymbol' "$source"
 grep -q 'kControllerFlagsOffset {0x191}' "$source"
 grep -q 'PC711CompatConfigureInterruptsResult' "$source"
 grep -q 'PC711CompatLegacyMSIXFlagAfter' "$source"
@@ -47,6 +52,7 @@ grep -q '^// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0$' "$source"
 grep -q '^# PolyForm Noncommercial License 1.0.0$' "$license"
 grep -q '^Required Notice: Copyright 2026 hrx114514x\.$' "$license"
 grep -q 'PolyForm Noncommercial 1.0.0' "$plist"
+nm -m "$binary" | grep -q 'weak external __ZN32IOPCIMessagedInterruptController24allocateDeviceInterruptsEP9IOServicejjPyPj'
 
 if grep -q -- '-pc711pcompat\|-pc711pstage' "$source"; then
 	echo "Manual activation or diagnostic-stage boot argument found" >&2

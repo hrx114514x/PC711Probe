@@ -27,16 +27,17 @@ IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0);
 
 其中 `0x20000` 请求 MSI-X。Darwin 25 同时删除了 Darwin 24 中由控制器偏移 `0x191` 的 bit `0x10` 选择的旧 MSI-X 特殊路径，统一使用标准事件源路径。
 
-随后对 Darwin 20–22 继续对比发现：`CreateDeviceInterrupt` 符号在旧 Kernel Collection 中未导出，而且到该函数执行时再申请 MSI-X 对 Ventura 已经太晚。旧版 `IOPCIFamily` 可能已解析其他中断分配，并拒绝第二次配置。
+继续对比发现：部分 Recovery 与 Installer 路径在执行到 `CreateDeviceInterrupt` 之前就会发出敏感命令，此时再请求 MSI-X 已经太晚。Big Sur 的 `IOPCIFamily` 还早于 `IOPCIDevice::configureInterrupts`，当 PC711 同时提供 MSI 与 MSI-X 时会先选择 MSI。
 
 ## 3. 实现最小兼容补丁
 
 PC711Probe 保留两个受版本限制的兼容入口：
 
 1. 自动匹配 PCI 身份 `1C5C:174A` 和 NVMe class `01:08:02`；
-2. Darwin 20–22 通过高优先级 PCI probe 提前申请一个 MSI-X 向量，然后返回空值，不占用设备；
-3. Darwin 23–24 路由 `CreateDeviceInterrupt`，申请 MSI-X 并清除旧路径选择位 `0x10`；
-4. Apple 原始 `IONVMeFamily` 始终负责真正的设备绑定与存储 I/O。
+2. Darwin 20 通过高优先级 PCI probe，调用 Big Sur 导出的消息中断分配器，把 PC711 已有的 MSI 分配切换为 MSI-X；
+3. Darwin 21–24 由同一个早期 probe 通过 `IOPCIDevice::configureInterrupts` 申请一个 MSI-X 向量；
+4. Darwin 23–24 继续路由 `CreateDeviceInterrupt` 作为后备，申请 MSI-X 并清除旧路径选择位 `0x10`；
+5. Apple 原始 `IONVMeFamily` 始终负责真正的设备绑定与存储 I/O。
 
 Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成。其他 PCI ID 保持 Apple 原始行为。macOS 26 已原生支持实测 PC711，因此插件最高只加载到 Darwin 24。
 
@@ -46,15 +47,16 @@ Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成�
 
 - 静态检查、架构检查和 `Info.plist` 校验；
 - 独立 USB EFI 启动验证；
-- macOS 13.4.1 与 15.6.1 中控制器、型号、namespace 与五个既有分区枚举；
-- macOS 12.5.1 与 14.6.1 Recovery 启动正常；
-- macOS 11.6 仍复现原始超时 KP，明确标记为未支持；
-- 重启至 macOS 26，确认 PC711 仍为 PCIe x4 / 8.0 GT/s、SMART Verified，且另一块 NVMe 无回归。
+- macOS 11.6、12.5.1、13.4.1 与 14.6.1 Recovery 启动正常；
+- macOS 15.6.1 完成完整安装，包括第二阶段 `macOS Installer` 启动；
+- 安装后的 macOS 15 正常发布控制器、型号、namespace 和分区；
+- 确认 PCIe x4 / 8.0 GT/s、TRIM 支持为“是”、S.M.A.R.T. 已验证，并实测写入 2766.1 MB/s、读取 3005.9 MB/s；
+- 重启至 macOS 26，确认 PC711 原生工作且另一块 NVMe 无回归。
 
 验证中没有抹除或修改 PC711 的现有分区，仓库也不分发任何 Apple 二进制。
 
 ## 5. 当前结论
 
-已证明该组合补丁可在 macOS 13.4.1 与 15.6.1 的上述实机环境中消除超时，并发布控制器、namespace 和分区。
+已证明该组合补丁可覆盖实测的 macOS 11–15 Recovery 与 Installer 路径。macOS 15.6.1 已完整安装并从 PC711 进入系统，存储发布正常，顺序性能接近接口上限。
 
-macOS 11 尚未修复；其他 build、固件或平台，以及完整安装、持续读写、TRIM 和睡眠唤醒也未覆盖。因此它是一个经过硬件验证的窄范围兼容补丁，不是通用 PC711 驱动。
+其他 build、固件或平台、长时间压力测试，以及 macOS 11–15 的睡眠唤醒尚未覆盖。因此它是一个经过硬件验证的窄范围兼容补丁，不是通用 PC711 驱动。

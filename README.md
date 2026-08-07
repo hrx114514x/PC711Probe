@@ -15,43 +15,43 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 
 ## Verified result
 
-PC711Probe has passed hardware boot tests on the same PC711 with macOS 13.4.1 and macOS 15.6.1 Recovery. Disk Utility opened, the model and all five existing partitions were enumerated, and the former NVMe command-timeout panic after roughly 75 seconds did not recur. macOS 11.6 still panics and is not currently supported.
+PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 11–14 were verified in Recovery, while macOS 15.6.1 completed a full installation and booted from the PC711. The former Identify/command timeout panic after roughly 75 seconds did not recur.
 
-![PC711 enumerated in macOS 15.6.1 Recovery](docs/images/recovery-success.jpg)
+![PC711 running macOS 15.6.1 with TRIM, PCIe link details, and measured disk performance](docs/images/macos15-installed-performance.png)
 
 | Item | Verified value |
 |---|---|
 | Controller | SK hynix `1C5C:174A`, NVMe class `01:08:02` |
 | Model | `SKHynix_HFS512GDE9X084N` (PC711) |
 | Firmware | `41010C22` |
-| v1.2.0 verified | macOS 13.4.1, build 22F82, Darwin 22.5.0 |
-| Previously verified | macOS 15.6.1, build 24G90, Darwin 24.6.0 |
-| Booted normally here | macOS 12.5.1 (21G83) and macOS 14.6.1 (23G93) Recovery |
-| Currently unsupported | macOS 11.6 (20G165), original NVMe timeout panic remains |
+| Recovery boot verified | macOS 11.6 (20G165), 12.5.1 (21G83), 13.4.1 (22F82), 14.6.1 (23G93) |
+| Full installation verified | macOS 15.6.1, build 24G90, Darwin 24.6.0 |
+| macOS 15 link/status | PCIe 3.0 x4, 8.0 GT/s, TRIM: Yes, S.M.A.R.T.: Verified |
+| macOS 15 measured result | 2766.1 MB/s write, 3005.9 MB/s read (Blackmagic Disk Speed Test) |
 | Native OS | macOS 26.5.1, build 25F80, Darwin 25.5.0 |
 | Boot environment | OpenCore 1.0.8, Lilu 1.7.3 |
 
 ## Automatic matching
 
-Version 1.2.0 requires no activation argument. Once enabled in OpenCore, it automatically patches only controllers matching:
+Version 1.7.0 requires no activation argument. Once enabled in OpenCore, it automatically patches only controllers matching:
 
 - PCI Vendor/Device: `1C5C:174A`; and
 - NVMe class: `01:08:02`.
 
 The PC711 model string is not available until the first Identify succeeds, so the plugin uses its known PCI controller identity before that command. Different capacities and OEM model strings do not affect matching. NVMe controllers with other PCI IDs retain Apple's original behavior.
 
-The declared automatic range is Darwin 20–24 (macOS 11–15). The plugin does not load on Darwin 25/macOS 26. macOS 11 is within the load range but still panics on the tested machine.
+The declared automatic range is Darwin 20–24 (macOS 11–15). The plugin does not load on Darwin 25/macOS 26, where the tested PC711 works natively.
 
 ## How it works
 
-On macOS 15.6.1, the PC711 controller reaches Ready state (`CSTS=1`), but the first Identify Controller command never returns through the older interrupt completion path and eventually panics.
+Without the patch, the PC711 controller reaches Ready state (`CSTS=1`), but Identify or another early NVMe command may never complete through the older interrupt path and eventually panics after roughly 75 seconds.
 
 Comparison of older Apple `IONVMeFamily` builds with macOS 26 showed that the newer OS requests one MSI-X vector before creating the interrupt source and removes an older MSI-X-specific path. For the matched PC711, PC711Probe:
 
-1. requests one MSI-X vector during early PCI matching on macOS 11–13, then declines attachment;
-2. leaves Apple `IONVMeFamily` as the actual NVMe driver;
-3. requests MSI-X and clears the old interrupt-path selector during interrupt-source creation on macOS 14–15; and
-4. leaves Identify, queues, namespaces, and storage I/O to Apple's driver.
+1. requests MSI-X during early PCI matching on macOS 11–15, before Recovery or Installer can issue sensitive polled commands;
+2. uses Big Sur's original PCI message-interrupt allocator on macOS 11 and `IOPCIDevice::configureInterrupts` on macOS 12–15;
+3. keeps the interrupt-source route as a fallback and clears the old selector on macOS 14–15; and
+4. declines attachment, leaving Identify, queues, namespaces, and all storage I/O to Apple `IONVMeFamily`.
 
 [Read the concise development process](docs/DEVELOPMENT.en.md)
 
@@ -84,7 +84,7 @@ Output: `build/Debug/PC711Probe.kext`
 
 ## Current validation boundary
 
-Controller initialization, Identify, namespace discovery, and partition publication are verified in macOS 13/15 Recovery; macOS 12/14 Recovery booted normally here. macOS 11 remains unresolved. Full installation, sustained I/O, TRIM, sleep/wake, other firmware, and other platforms have not completed hardware validation. Keep a rollback EFI and data backup for the first test.
+Recovery boot is verified on macOS 11–14. A complete macOS 15.6.1 installation, normal system boot, namespace/partition publication, PCIe 3.0 x4 link, reported TRIM support, S.M.A.R.T. status, and a 2766.1/3005.9 MB/s write/read benchmark are verified on the tested PC711. Sleep/wake on macOS 11–15, long-duration stress, other firmware revisions, and other platforms remain outside the current validation boundary. Keep a rollback EFI and data backup for the first test.
 
 ## License
 
