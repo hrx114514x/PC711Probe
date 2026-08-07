@@ -19,4 +19,4 @@ First hardware-verified Darwin 24.6 compatibility build for the tested SK hynix 
 - Full installation, sustained I/O, TRIM, and sleep/wake on macOS 15 are not yet verified.
 - 不是通用 NVMe 驱动；其他型号、固件、平台和系统版本均未验证。
 
-Read `README.md` / `README_EN.md` and the installation guide before use.
+Read `README.md` / `README_CN.md` and the installation guide before use.

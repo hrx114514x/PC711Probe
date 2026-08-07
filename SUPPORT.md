@@ -2,7 +2,7 @@
 
 ## Cryptocurrency
 
-If PC711Probe helped you, you can voluntarily support continued development, hardware testing, firmware coverage, and macOS compatibility research.
+Donations directly support my continued development of PC711Probe, hardware testing, and future macOS compatibility work.
 
 ### USDC — Solana
 
@@ -24,7 +24,7 @@ If PC711Probe helped you, you can voluntarily support continued development, har
 
 ## 支持 PC711Probe
 
-如果 PC711Probe 对你有帮助，欢迎自愿支持后续开发、硬件测试、不同固件验证以及 macOS 兼容性研究。
+赞助会直接支持我继续开发 PC711Probe、进行硬件测试和后续 macOS 兼容性工作。
 
 ### USDC — Solana
 

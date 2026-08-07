@@ -45,6 +45,7 @@ grep -q 'KernelVersion::Sequoia' "$source"
 grep -q 'PC711ProbePlugin::globalPlugin().init()' "$source"
 grep -q '^// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0$' "$source"
 grep -q '^# PolyForm Noncommercial License 1.0.0$' "$license"
+grep -q '^Required Notice: Copyright 2026 hrx114514x\.$' "$license"
 grep -q 'PolyForm Noncommercial 1.0.0' "$plist"
 
 if grep -q -- '-pc711pcompat\|-pc711pstage' "$source"; then
