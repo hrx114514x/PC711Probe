@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 #include <mach/kmod.h>
 
@@ -16,7 +16,7 @@ extern kern_return_t _stop(kmod_info_t *info, void *data);
  * setup (including OSKextGetCurrentIdentifier) and can leave the IOKit
  * personality unable to instantiate.
  */
-KMOD_EXPLICIT_DECL(com.stationk9.driver.PC711Probe, "0.1.2", _start, _stop)
+KMOD_EXPLICIT_DECL(com.stationk9.driver.PC711Probe, "1.2.0", _start, _stop)
 
 kmod_start_func_t *_realmain = PC711Probe_kern_start;
 kmod_stop_func_t *_antimain = PC711Probe_kern_stop;

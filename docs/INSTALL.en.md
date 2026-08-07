@@ -19,13 +19,15 @@ English | [简体中文](INSTALL.zh-CN.md)
    | BundlePath | `PC711Probe.kext` |
    | ExecutablePath | `Contents/MacOS/PC711Probe` |
    | PlistPath | `Contents/Info.plist` |
-   | MinKernel | `8.0.0` |
+   | MinKernel | `20.0.0` |
    | MaxKernel | `24.99.99` |
 
-3. Do not add `-pc711pcompat`; version 1.0.0 automatically matches the `1C5C:174A` PC711.
+3. Do not add an activation argument; version 1.2.0 automatically matches the `1C5C:174A` PC711.
 4. Disable AML/SSDT code that hides the PC711 through `_STA=0` or spoofed class/vendor/device values.
 5. Temporarily disable NVMeFix for the first test so results are not mixed.
 6. Validate the configuration with the `ocvalidate` matching the OpenCore version.
+
+> macOS 11 is within the kext load range, but the tested machine still hits the original NVMe timeout panic and must not be considered supported yet.
 
 ## First boot
 

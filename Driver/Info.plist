@@ -15,11 +15,24 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>1.2.0</string>
 	<key>CFBundleVersion</key>
-	<string>1.0.0</string>
+	<string>1.2.0</string>
 	<key>IOKitPersonalities</key>
 	<dict>
+		<key>PC711EarlyMSIX</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.stationk9.driver.PC711Probe</string>
+			<key>IOClass</key>
+			<string>PC711EarlyMSIX</string>
+			<key>IOPCIPrimaryMatch</key>
+			<string>0x174A1C5C</string>
+			<key>IOProbeScore</key>
+			<integer>100000</integer>
+			<key>IOProviderClass</key>
+			<string>IOPCIDevice</string>
+		</dict>
 		<key>PC711Probe</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
@@ -35,7 +48,7 @@
 		</dict>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright 2026 StationK9. BSD-3-Clause.</string>
+	<string>Copyright 2026 PC711Probe contributors. PolyForm Noncommercial 1.0.0.</string>
 	<key>OSBundleCompatibleVersion</key>
 	<string>0.1.2</string>
 	<key>OSBundleLibraries</key>
