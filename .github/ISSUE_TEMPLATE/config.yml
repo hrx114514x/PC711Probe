@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Installation guide / 安装指南
+    url: https://github.com/hrx114514x/PC711Probe/blob/main/docs/INSTALL.en.md
+    about: Read the installation and rollback guide before testing / 测试前请阅读安装与回滚指南

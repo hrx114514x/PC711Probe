@@ -59,4 +59,6 @@ No existing PC711 partition was erased or modified during validation, and the re
 
 The combined patch removes the timeout across the tested macOS 11–15 Recovery and Installer paths. macOS 15.6.1 completed installation and booted from the PC711 with normal storage publication and near-interface-limit sequential performance.
 
-Other builds, firmware revisions, platforms, long-duration stress, and macOS 11–15 sleep/wake remain untested. PC711Probe is therefore a narrowly scoped, hardware-verified compatibility patch rather than a generic PC711 driver.
+Post-release testing on macOS 15.7.9 added three 32 GiB write/read/two-pass SHA-256 rounds, dual 8 GiB parallel I/O, 20,000 small-file operations, three sleep/wake cycles, three reboots, and APFS verification. All completed without a panic, NVMe timeout, I/O error, media loss, or hash mismatch.
+
+Other PC711 capacities and firmware revisions, Intel platforms, and other products exposing `1C5C:174A` remain untested. PC711Probe is therefore a narrowly scoped, hardware-verified compatibility patch rather than a generic NVMe driver.

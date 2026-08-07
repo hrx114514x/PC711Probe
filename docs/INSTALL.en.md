@@ -8,6 +8,7 @@ English | [简体中文](INSTALL.zh-CN.md)
 - Use an independent USB EFI for the first test and retain another bootable EFI.
 - Ensure Lilu is installed and ordered before PC711Probe.
 - macOS 26 drives the PC711 natively and does not need this plugin.
+- PC711Probe matches PCI `1C5C:174A` with NVMe class `01:08:02` before Identify. Gold P31 and BC711 devices may expose the same identity, but only `SKHynix_HFS512GDE9X084N` with firmware `41010C22` has been validated.
 
 ## OpenCore configuration
 
@@ -22,12 +23,12 @@ English | [简体中文](INSTALL.zh-CN.md)
    | MinKernel | `20.0.0` |
    | MaxKernel | `24.99.99` |
 
-3. Do not add an activation argument; version 1.7.0 automatically matches the `1C5C:174A` PC711.
+3. Do not add an activation argument; version 1.7.0 automatically matches `1C5C:174A` with NVMe class `01:08:02`.
 4. Disable AML/SSDT code that hides the PC711 through `_STA=0` or spoofed class/vendor/device values.
 5. Temporarily disable NVMeFix for the first test so results are not mixed.
 6. Validate the configuration with the `ocvalidate` matching the OpenCore version.
 
-> The tested PC711 has booted macOS 11–14 Recovery and completed a macOS 15.6.1 installation. Other firmware revisions and platforms still require a rollback-capable first test.
+> The tested PC711 has booted macOS 11–14 Recovery, completed a macOS 15.6.1 installation, and passed extended I/O, sleep/wake, and reboot validation on macOS 15.7.9. Other drives, firmware revisions, and platforms still require a rollback-capable first test.
 
 ## First boot
 

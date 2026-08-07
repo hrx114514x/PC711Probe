@@ -1,0 +1,94 @@
+name: Hardware validation / 硬件验证
+description: Report a success or failure on a PC711 or another 1C5C:174A device / 报告 PC711 或其他 1C5C:174A 设备的成功或失败结果
+title: "[Hardware] "
+labels: ["hardware validation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for contributing an independent hardware sample. Remove serial numbers, SMBIOS data, credentials, and other private information before uploading logs.
+
+        感谢提供独立硬件样本。上传日志前请删除序列号、SMBIOS 数据、凭据及其他隐私信息。
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result / 结果
+      options:
+        - Success / 成功
+        - Partial success / 部分成功
+        - Kernel panic or timeout / KP 或超时
+        - Not detected / 未识别
+    validations:
+      required: true
+  - type: input
+    id: drive
+    attributes:
+      label: SSD model, capacity, and firmware / SSD 型号、容量和固件
+      placeholder: SKHynix_HFS512GDE9X084N, 512 GB, 41010C22
+    validations:
+      required: true
+  - type: input
+    id: pci
+    attributes:
+      label: PCI identity / PCI 身份
+      description: Vendor, device, class, revision, subsystem vendor and device / Vendor、Device、Class、Revision、Subsystem Vendor 和 Device
+      placeholder: 1C5C:174A, class 01:08:02, revision ..., subsystem ...
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform / 平台
+      description: CPU and motherboard, laptop, or desktop model / CPU 与主板、笔记本或整机型号
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS / macOS 版本
+      placeholder: macOS 15.7.9, build 24G830, Darwin 24.6.0
+    validations:
+      required: true
+  - type: input
+    id: bootloader
+    attributes:
+      label: OpenCore, Lilu, and PC711Probe versions / OpenCore、Lilu 和 PC711Probe 版本
+    validations:
+      required: true
+  - type: dropdown
+    id: nvmefix
+    attributes:
+      label: NVMeFix status / NVMeFix 状态
+      options:
+        - Not loaded / 未加载
+        - Loaded / 已加载
+        - Unknown / 不确定
+    validations:
+      required: true
+  - type: checkboxes
+    id: boot_stages
+    attributes:
+      label: Working boot stages / 可正常启动的阶段
+      options:
+        - label: Recovery
+        - label: macOS Installer
+        - label: Installed system / 已安装系统
+  - type: textarea
+    id: testing
+    attributes:
+      label: Sleep, reboot, and I/O testing / 睡眠、重启和 I/O 测试
+      description: Include counts, workload, hashes, and any error observed / 请写明次数、负载、哈希与任何错误
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence / 脱敏证据
+      description: Attach relevant panic excerpts, logs, screenshots, or IORegistry output / 附上相关 panic 摘要、日志、截图或 IORegistry 输出
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation / 确认
+      options:
+        - label: I removed serial numbers, SMBIOS data, credentials, and other private information. / 我已删除序列号、SMBIOS 数据、凭据及其他隐私信息。
+          required: true
+        - label: I tested with a rollback-capable EFI and understand that unvalidated hardware may fail. / 我使用了可回滚 EFI，并了解未验证硬件可能失败。
+          required: true
