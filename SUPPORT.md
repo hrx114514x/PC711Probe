@@ -55,5 +55,3 @@ Donations are voluntary. They do not constitute a purchase, warranty, compatibil
 > 转账前请核对网络和完整地址。上面的 USDC 仅用于 **Solana 网络上的 USDC**，请勿通过 Ethereum、Base、Arbitrum 或其他网络发送。链上转账通常无法撤销。
 
 赞助完全自愿，不构成软件购买、担保、兼容性承诺、开发进度承诺、优先技术支持或商业授权。
-
-**永远不要向任何人提供助记词、Recovery Phrase 或私钥。**
