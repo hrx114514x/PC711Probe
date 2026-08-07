@@ -29,7 +29,7 @@ plutil -lint "$project_dir/Driver/Info.plist"
 mkdir -p "$binary_dir"
 
 common_cxx_flags="-arch x86_64 -std=c++14 -fapple-kext -fno-builtin -fno-exceptions -fno-rtti -fno-asynchronous-unwind-tables"
-common_defines="-DKERNEL -DKERNEL_PRIVATE -D__KERNEL__ -DPRODUCT_NAME=PC711Probe -DMODULE_VERSION=1.0.0 -DMACH_ASSERT=1"
+common_defines="-DKERNEL -DKERNEL_PRIVATE -D__KERNEL__ -DPRODUCT_NAME=PC711Probe -DMODULE_VERSION=1.2.0 -DMACH_ASSERT=1"
 
 xcrun clang++ $common_cxx_flags \
 	-c \

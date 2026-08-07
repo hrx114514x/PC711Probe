@@ -27,14 +27,16 @@ IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0);
 
 其中 `0x20000` 请求 MSI-X。Darwin 25 同时删除了 Darwin 24 中由控制器偏移 `0x191` 的 bit `0x10` 选择的旧 MSI-X 特殊路径，统一使用标准事件源路径。
 
+随后对 Darwin 20–22 继续对比发现：`CreateDeviceInterrupt` 符号在旧 Kernel Collection 中未导出，而且到该函数执行时再申请 MSI-X 对 Ventura 已经太晚。旧版 `IOPCIFamily` 可能已解析其他中断分配，并拒绝第二次配置。
+
 ## 3. 实现最小兼容补丁
 
-PC711Probe 通过 Lilu 只路由 `CreateDeviceInterrupt`：
+PC711Probe 保留两个受版本限制的兼容入口：
 
 1. 自动匹配 PCI 身份 `1C5C:174A` 和 NVMe class `01:08:02`；
-2. 请求一个 MSI-X 向量；
-3. 调用 Apple 原始实现创建事件源；
-4. 清除旧 MSI-X 路径选择位 `0x10`。
+2. Darwin 20–22 通过高优先级 PCI probe 提前申请一个 MSI-X 向量，然后返回空值，不占用设备；
+3. Darwin 23–24 路由 `CreateDeviceInterrupt`，申请 MSI-X 并清除旧路径选择位 `0x10`；
+4. Apple 原始 `IONVMeFamily` 始终负责真正的设备绑定与存储 I/O。
 
 Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成。其他 PCI ID 保持 Apple 原始行为。macOS 26 已原生支持实测 PC711，因此插件最高只加载到 Darwin 24。
 
@@ -44,13 +46,15 @@ Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成�
 
 - 静态检查、架构检查和 `Info.plist` 校验；
 - 独立 USB EFI 启动验证；
-- macOS 15.6.1 中控制器、型号、namespace 与五个既有分区枚举；
+- macOS 13.4.1 与 15.6.1 中控制器、型号、namespace 与五个既有分区枚举；
+- macOS 12.5.1 与 14.6.1 Recovery 启动正常；
+- macOS 11.6 仍复现原始超时 KP，明确标记为未支持；
 - 重启至 macOS 26，确认 PC711 仍为 PCIe x4 / 8.0 GT/s、SMART Verified，且另一块 NVMe 无回归。
 
 验证中没有抹除或修改 PC711 的现有分区，仓库也不分发任何 Apple 二进制。
 
 ## 5. 当前结论
 
-已证明该组合补丁可在上述硬件与系统环境中消除第一条 Identify 超时，并发布控制器、namespace 和分区。
+已证明该组合补丁可在 macOS 13.4.1 与 15.6.1 的上述实机环境中消除超时，并发布控制器、namespace 和分区。
 
-尚未覆盖其他 macOS 15 build、其他固件或平台，以及 macOS 15 的完整安装、持续读写、TRIM 和睡眠唤醒。因此它是一个经过硬件验证的窄范围兼容补丁，不是通用 PC711 驱动。
+macOS 11 尚未修复；其他 build、固件或平台，以及完整安装、持续读写、TRIM 和睡眠唤醒也未覆盖。因此它是一个经过硬件验证的窄范围兼容补丁，不是通用 PC711 驱动。

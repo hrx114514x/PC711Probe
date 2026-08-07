@@ -22,3 +22,7 @@ Before opening a pull request / 提交 PR 前：
 git submodule update --init --recursive
 ./Scripts/verify.sh
 ```
+
+Unless explicitly agreed otherwise in writing, contributions accepted into the v1.2.0-and-later development line are provided under the project's [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+除非另有明确书面约定，合入 v1.2.0 及后续开发分支的贡献均按本项目的 [PolyForm Noncommercial License 1.0.0](LICENSE) 提供。

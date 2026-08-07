@@ -19,13 +19,15 @@
    | BundlePath | `PC711Probe.kext` |
    | ExecutablePath | `Contents/MacOS/PC711Probe` |
    | PlistPath | `Contents/Info.plist` |
-   | MinKernel | `8.0.0` |
+   | MinKernel | `20.0.0` |
    | MaxKernel | `24.99.99` |
 
-3. 不要添加 `-pc711pcompat`；1.0.0 会自动匹配 `1C5C:174A` PC711。
+3. 不要添加启用参数；1.2.0 会自动匹配 `1C5C:174A` PC711。
 4. 停用隐藏 PC711 的 AML/SSDT，包括 `_STA=0` 或伪造 class/vendor/device 的规则。
 5. 首次验证时暂时停用 NVMeFix，避免混淆结果。
 6. 使用与 OpenCore 版本匹配的 `ocvalidate` 检查配置。
+
+> macOS 11 虽在 Kext 加载范围内，但目标实机仍会发生原始 NVMe 超时 KP，目前不应视为已支持。
 
 ## 首次启动
 

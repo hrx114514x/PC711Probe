@@ -8,6 +8,6 @@ PC711Probe uses the following source dependencies as pinned Git submodules:
 - **MacKernelSDK** — <https://github.com/acidanthera/MacKernelSDK>
   Contains headers and build support distributed under the licenses retained in that submodule, including the Apple Public Source License where applicable.
 
-The PC711Probe project license applies only to project-authored files. It does not replace or restrict third-party licenses.
+The PolyForm Noncommercial license for PC711Probe applies only to project-authored files in the v1.2.0-and-later development line. It does not replace or restrict third-party licenses.
 
 No Apple Kernel Collection, kernel, or `IONVMeFamily` binary is included in this repository. Development documentation describes independently observed symbols and behavior for interoperability research.

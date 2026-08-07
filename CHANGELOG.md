@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0 — 2026-08-07
+
+- Added early, PC711-only MSI-X allocation for Darwin 20–22 without taking ownership away from Apple `IONVMeFamily`.
+- Removed the direct dependency on the unexported legacy `IOPCIDevice::configureInterrupts` symbol.
+- Added a legacy `CreateDeviceInterrupt` route for Darwin 20–22.
+- Hardware-validated macOS 13.4.1 Recovery; macOS 11.6 remains unresolved.
+- Changed the v1.2.0-and-later project license to PolyForm Noncommercial 1.0.0.
+- Added bilingual voluntary cryptocurrency support information.
+
 ## 1.0.0 — 2026-08-07
 
 - Enabled automatic operation without `-pc711pcompat`.
