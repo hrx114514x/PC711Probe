@@ -12,8 +12,6 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 > PC711Probe is free for personal and noncommercial use. If it fixed the PC711 kernel panic on your machine, consider supporting continued development and hardware testing.
 >
 > **[Support the project](SUPPORT.md)**
->
-> Donations do not constitute a purchase or grant commercial usage rights.
 
 ## Verified result
 
