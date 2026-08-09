@@ -8,27 +8,29 @@ English | [简体中文](INSTALL.zh-CN.md)
 - Use an independent USB EFI for the first test and retain another bootable EFI.
 - Ensure Lilu is installed and ordered before PC711Probe.
 - macOS 26 drives the PC711 natively and does not need this plugin.
-- PC711Probe matches PCI `1C5C:174A` with NVMe class `01:08:02` before Identify. Gold P31 and BC711 devices may expose the same identity, but only `SKHynix_HFS512GDE9X084N` with firmware `41010C22` has been validated.
+- The standard build matches PCI `1C5C:174A` with NVMe class `01:08:02`. The Force build ignores Vendor/Device ID and affects every NVMe controller in the machine.
 
 ## OpenCore configuration
 
-1. Copy `PC711Probe.kext` to `EFI/OC/Kexts`.
+1. Choose and copy exactly one Kext to `EFI/OC/Kexts`:
+   - `PC711Probe.kext` (recommended): restricted to PCI `1C5C:174A` and NVMe class `01:08:02`;
+   - `PC711ProbeForce.kext` (opt-in): matches any Vendor/Device with NVMe class `01:08:02`.
 2. Add and enable the following under `Kernel -> Add`:
 
    | Field | Value |
    |---|---|
-   | BundlePath | `PC711Probe.kext` |
+   | BundlePath | `PC711Probe.kext` or `PC711ProbeForce.kext` |
    | ExecutablePath | `Contents/MacOS/PC711Probe` |
    | PlistPath | `Contents/Info.plist` |
    | MinKernel | `20.0.0` |
    | MaxKernel | `24.99.99` |
 
-3. Do not add an activation argument; version 1.7.0 automatically matches `1C5C:174A` with NVMe class `01:08:02`.
+3. Do not add an activation argument and never enable both variants. They intentionally share one bundle identifier.
 4. Disable AML/SSDT code that hides the PC711 through `_STA=0` or spoofed class/vendor/device values.
 5. Temporarily disable NVMeFix for the first test so results are not mixed.
 6. Validate the configuration with the `ocvalidate` matching the OpenCore version.
 
-> The tested PC711 has booted macOS 11–14 Recovery, completed a macOS 15.6.1 installation, and passed extended I/O, sleep/wake, and reboot validation on macOS 15.7.9. Other drives, firmware revisions, and platforms still require a rollback-capable first test.
+> PC711 `SKHynix_HFS512GDE9X084N` and BC711 `HFM512GD3JX016N` / `HFM512GD3JX013N` have reported successful results. The deepest matrix belongs to the PC711. The Force build is not yet separately hardware-validated.
 
 ## First boot
 

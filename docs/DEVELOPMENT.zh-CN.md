@@ -31,15 +31,15 @@ IOPCIDevice::configureInterrupts(0x20000, 1, 1, 0);
 
 ## 3. 实现最小兼容补丁
 
-PC711Probe 保留两个受版本限制的兼容入口：
+PC711Probe 保留两个受版本限制的兼容入口，并构建两个匹配版本：
 
-1. 自动匹配 PCI 身份 `1C5C:174A` 和 NVMe class `01:08:02`；
+1. 标准 Kext 匹配 PCI 身份 `1C5C:174A` 和 NVMe class `01:08:02`，可选 Force Kext 只匹配 NVMe class，不检查 Vendor/Device；
 2. Darwin 20 通过高优先级 PCI probe，调用 Big Sur 导出的消息中断分配器，把 PC711 已有的 MSI 分配切换为 MSI-X；
 3. Darwin 21–24 由同一个早期 probe 通过 `IOPCIDevice::configureInterrupts` 申请一个 MSI-X 向量；
 4. Darwin 23–24 继续路由 `CreateDeviceInterrupt` 作为后备，申请 MSI-X 并清除旧路径选择位 `0x10`；
 5. Apple 原始 `IONVMeFamily` 始终负责真正的设备绑定与存储 I/O。
 
-Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成。其他 PCI ID 保持 Apple 原始行为。macOS 26 已原生支持实测 PC711，因此插件最高只加载到 Darwin 24。
+Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成。只有标准版会让其他 PCI ID 保持 Apple 原始行为；Force 版会故意对每一个 NVMe class 控制器应用兼容路径。实测 PC711 在 macOS 26 已原生免驱，因此两个版本最高都只加载到 Darwin 24。
 
 ## 4. 构建与验证
 
@@ -61,4 +61,4 @@ Identify、队列、namespace 和存储 I/O 仍由 Apple `IONVMeFamily` 完成�
 
 发布后又在 macOS 15.7.9 完成了 3 轮 32 GiB 写入/读取/两次 SHA-256 校验、双路 8 GiB 并行 I/O、2 万个小文件、3 次睡眠唤醒、3 次重启和 APFS 校验，未出现 KP、NVMe 超时、I/O 错误、掉盘或哈希不一致。
 
-其他 PC711 容量/固件、Intel 平台以及其他使用 `1C5C:174A` 的产品尚未验证。因此它是一个经过硬件验证的窄范围兼容补丁，不是通用 NVMe 驱动。
+两个 BC711 型号 `HFM512GD3JX016N` 和 `HFM512GD3JX013N` 后续也已通过功能测试，证明该兼容路径不只适用于原 PC711 型号。两者的详细固件/平台矩阵与扩展负载结果尚未记录。Force 版已通过编译与静态检查，但尚未单独完成实机验证。PC711Probe 仍然是兼容补丁，不是替代 NVMe 驱动。

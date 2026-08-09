@@ -2,6 +2,9 @@
 
 #include <mach/kmod.h>
 
+#define PC711_STRINGIFY_INNER(value) #value
+#define PC711_STRINGIFY(value) PC711_STRINGIFY_INNER(value)
+
 extern kern_return_t PC711Probe_kern_start(kmod_info_t *info, void *data);
 extern kern_return_t PC711Probe_kern_stop(kmod_info_t *info, void *data);
 extern kern_return_t _start(kmod_info_t *info, void *data);
@@ -16,7 +19,8 @@ extern kern_return_t _stop(kmod_info_t *info, void *data);
  * setup (including OSKextGetCurrentIdentifier) and can leave the IOKit
  * personality unable to instantiate.
  */
-KMOD_EXPLICIT_DECL(com.stationk9.driver.PC711Probe, "1.7.0", _start, _stop)
+KMOD_EXPLICIT_DECL(com.stationk9.driver.PC711Probe,
+	PC711_STRINGIFY(MODULE_VERSION), _start, _stop)
 
 kmod_start_func_t *_realmain = PC711Probe_kern_start;
 kmod_stop_func_t *_antimain = PC711Probe_kern_stop;
