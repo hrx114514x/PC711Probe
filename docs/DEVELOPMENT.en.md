@@ -31,15 +31,15 @@ Further comparison showed that requesting MSI-X only from `CreateDeviceInterrupt
 
 ## 3. Implement the minimal compatibility patch
 
-PC711Probe keeps two version-bounded compatibility entry points:
+PC711Probe keeps two version-bounded compatibility entry points and builds two targeting variants:
 
-1. PCI identity `1C5C:174A` with NVMe class `01:08:02` is matched automatically;
+1. the standard Kext matches PCI identity `1C5C:174A` with NVMe class `01:08:02`, while the opt-in Force Kext matches the NVMe class without a Vendor/Device check;
 2. on Darwin 20, a high-score PCI probe switches the existing PC711 MSI allocation to MSI-X through Big Sur's exported message-interrupt allocator;
 3. on Darwin 21–24, the same early probe requests one MSI-X vector through `IOPCIDevice::configureInterrupts`;
 4. on Darwin 23–24, `CreateDeviceInterrupt` is also routed as a fallback to request MSI-X and clear the old path-selector bit `0x10`; and
 5. Apple `IONVMeFamily` remains responsible for the actual device attachment and storage I/O.
 
-Identify, queues, namespaces, and storage I/O remain handled by Apple `IONVMeFamily`. Other PCI IDs retain Apple's original behavior. The tested PC711 works natively on macOS 26, so the plugin loads only through Darwin 24.
+Identify, queues, namespaces, and storage I/O remain handled by Apple `IONVMeFamily`. Other PCI IDs retain Apple's original behavior only with the standard build; the Force build intentionally applies the compatibility route to every NVMe class controller. Both builds stop at Darwin 24 because the tested PC711 works natively on macOS 26.
 
 ## 4. Build and validate
 
@@ -61,4 +61,4 @@ The combined patch removes the timeout across the tested macOS 11–15 Recovery 
 
 Post-release testing on macOS 15.7.9 added three 32 GiB write/read/two-pass SHA-256 rounds, dual 8 GiB parallel I/O, 20,000 small-file operations, three sleep/wake cycles, three reboots, and APFS verification. All completed without a panic, NVMe timeout, I/O error, media loss, or hash mismatch.
 
-Other PC711 capacities and firmware revisions, Intel platforms, and other products exposing `1C5C:174A` remain untested. PC711Probe is therefore a narrowly scoped, hardware-verified compatibility patch rather than a generic NVMe driver.
+Two BC711 models, `HFM512GD3JX016N` and `HFM512GD3JX013N`, have subsequently passed functional testing, showing that the compatibility path is not limited to the original PC711 model. Their detailed firmware/platform matrices and extended workload results have not yet been recorded. The Force build is compile/static-validated but not yet separately hardware-validated. PC711Probe remains a compatibility patch rather than a replacement NVMe driver.

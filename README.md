@@ -2,12 +2,12 @@
 
 English | [简体中文](README_CN.md)
 
-An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-timeout kernel panic affecting the SK hynix PC711 on older macOS releases.
+An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-timeout kernel panic affecting tested SK hynix PC711 and BC711 NVMe drives on older macOS releases.
 
 > **New finding: PC711 works natively on macOS 26.** The same physical PC711 was identified by Apple `IONVMeFamily` on macOS 26.5.1 (25F80 / Darwin 25.5.0), with working I/O and sleep/wake. Neither PC711Probe nor NVMeFix was required. PC711Probe does not load on macOS 26.
 
 > [!IMPORTANT]
-> PC711Probe must match the controller before NVMe Identify makes the model string available. It therefore matches PCI `1C5C:174A` with NVMe class `01:08:02`, an identity also reported by SK hynix Gold P31 and BC711 devices. Only `SKHynix_HFS512GDE9X084N` with firmware `41010C22` has been hardware-validated. All other `1C5C:174A` devices remain untested and should be tried only with a rollback-capable EFI and a current data backup.
+> The recommended `PC711Probe.kext` matches PCI `1C5C:174A` with NVMe class `01:08:02`. Version 1.8.0 also provides an opt-in `PC711ProbeForce.kext` that ignores Vendor/Device ID and applies the MSI-X compatibility path to every NVMe class `01:08:02` controller in the machine. Never load both variants. Use Force only when the standard build cannot match a known affected drive, with a rollback EFI and current data backup.
 
 > [!NOTE]
 > ## ❤️ Support PC711Probe
@@ -18,7 +18,7 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 
 ## Verified result
 
-PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 11–14 were verified in Recovery, while macOS 15.6.1 completed a full installation and booted from the PC711. The installed system was later updated to macOS 15.7.9 and passed the extended storage, sleep/wake, and reboot test described below. The former Identify/command timeout panic after roughly 75 seconds did not recur.
+PC711Probe has now been reported working with one PC711 (`SKHynix_HFS512GDE9X084N`) and two BC711 models (`HFM512GD3JX016N` and `HFM512GD3JX013N`). The PC711 completed the full macOS 11–15 matrix and extended macOS 15.7.9 validation below; both 512 GB BC711 variants also passed functional testing. The former Identify/command timeout panic after roughly 75 seconds did not recur.
 
 ![PC711 running macOS 15.6.1 with TRIM, PCIe link details, and measured disk performance](docs/images/macos15-installed-performance.png)
 
@@ -35,16 +35,20 @@ PC711Probe 1.7.0 has booted the same physical PC711 across macOS 11–15. macOS 
 | Native OS | macOS 26.5.1, build 25F80, Darwin 25.5.0 |
 | Boot environment | OpenCore 1.0.8, Lilu 1.7.3 |
 
-## Automatic matching
+Additional successful BC711 model strings: `HFM512GD3JX016N` and `HFM512GD3JX013N`. Their detailed firmware, platform, and stress-test matrices have not yet been recorded.
 
-Version 1.7.0 requires no activation argument. Once enabled in OpenCore, it automatically patches controllers matching:
+## Two build variants
 
-- PCI Vendor/Device: `1C5C:174A`; and
-- NVMe class: `01:08:02`.
+Version 1.8.0 builds two mutually exclusive Kexts:
 
-The PC711 model string is not available until the first Identify succeeds, so the plugin uses the PCI controller identity before that command. This makes different capacities and OEM model strings possible, but it also means the plugin cannot distinguish the validated PC711 from untested P31 or BC711 devices that expose the same identity. NVMe controllers with other PCI IDs retain Apple's original behavior.
+| Kext | Matching | Intended use |
+|---|---|---|
+| `PC711Probe.kext` | PCI `1C5C:174A` and NVMe class `01:08:02` | Recommended default for known PC711/BC711 174A systems |
+| `PC711ProbeForce.kext` | Any PCI Vendor/Device with NVMe class `01:08:02` | Opt-in fallback for an affected drive with a different PCI ID |
 
-The declared automatic range is Darwin 20–24 (macOS 11–15). The plugin does not load on Darwin 25/macOS 26, where the tested PC711 works natively.
+The model string is unavailable until the first Identify succeeds, so neither build can select by model name. The Force build removes the PCI Vendor/Device gate from both the early IOKit personality and the runtime route; it therefore applies to every NVMe controller in the machine, including controllers that may not need the patch. The two Kexts deliberately share one bundle identifier and must never be enabled together.
+
+Both builds require no activation argument and load only on Darwin 20–24 (macOS 11–15). They do not load on Darwin 25/macOS 26, where the tested PC711 works natively.
 
 ## How it works
 
@@ -62,15 +66,16 @@ Comparison of older Apple `IONVMeFamily` builds with macOS 26 showed that the ne
 ## Installation
 
 1. Back up the current EFI and start with a rollback-capable test USB.
-2. Ensure Lilu loads before PC711Probe.
-3. Copy `PC711Probe.kext` to `EFI/OC/Kexts` and add it under `Kernel -> Add`:
-   - `BundlePath`: `PC711Probe.kext`
+2. Choose exactly one build: normally `PC711Probe.kext`; use `PC711ProbeForce.kext` only when the standard PCI matcher cannot target the affected drive.
+3. Ensure Lilu loads before the selected PC711Probe variant.
+4. Copy the selected Kext to `EFI/OC/Kexts` and add it under `Kernel -> Add`:
+   - `BundlePath`: `PC711Probe.kext` or `PC711ProbeForce.kext`
    - `ExecutablePath`: `Contents/MacOS/PC711Probe`
    - `PlistPath`: `Contents/Info.plist`
    - `MinKernel`: `20.0.0`
    - `MaxKernel`: `24.99.99`
-4. Disable AML/SSDT code that hides the PC711 through `_STA=0` or spoofed class/vendor/device values.
-5. Do not add a PC711Probe activation boot argument.
+5. Disable AML/SSDT code that hides the target through `_STA=0` or spoofed class/vendor/device values.
+6. Do not add a PC711Probe activation boot argument and do not enable both variants.
 
 Use `-pc711poff` only as an emergency disable switch. Use `-pc711pdbg` for debug logging.
 
@@ -84,13 +89,13 @@ cd PC711Probe
 ./Scripts/verify.sh
 ```
 
-Output: `build/Debug/PC711Probe.kext`
+Outputs: `build/Debug/PC711Probe.kext` and `build/Debug/PC711ProbeForce.kext`
 
 ## Current validation boundary
 
 Recovery boot is verified on macOS 11–14. A complete macOS 15.6.1 installation, normal system boot, namespace/partition publication, PCIe 3.0 x4 link, reported TRIM support, S.M.A.R.T. status, and a 2766.1/3005.9 MB/s write/read benchmark are verified on the tested PC711. On macOS 15.7.9, the same drive also passed 96 GiB of sequential write/read/two-pass SHA-256 validation, dual 8 GiB parallel I/O, 20,000 small-file operations, three sleep/wake cycles, three reboots, and APFS verification without a panic, NVMe timeout, I/O error, media loss, or hash mismatch.
 
-These results cover one physical `SKHynix_HFS512GDE9X084N`, firmware `41010C22`, on one AMD platform. Other PC711 capacities and firmware revisions, Intel platforms, and other `1C5C:174A` products remain untested. Keep a rollback EFI and data backup for the first test, and submit independent results through [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues).
+The deepest matrix covers one physical PC711 (`SKHynix_HFS512GDE9X084N`), firmware `41010C22`, on one AMD platform. Two BC711 models, `HFM512GD3JX016N` and `HFM512GD3JX013N`, have also passed functional testing, but their detailed firmware/platform matrices and the same extended workload have not yet been recorded. The Force build is compile/static-validated but has not yet received separate hardware validation. Keep a rollback EFI and data backup for the first test, and submit independent results through [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues).
 
 ## License
 

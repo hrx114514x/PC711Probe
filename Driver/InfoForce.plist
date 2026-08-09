@@ -11,7 +11,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>PC711Probe</string>
+	<string>PC711ProbeForce</string>
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
@@ -26,8 +26,8 @@
 			<string>com.stationk9.driver.PC711Probe</string>
 			<key>IOClass</key>
 			<string>PC711EarlyMSIX</string>
-			<key>IOPCIPrimaryMatch</key>
-			<string>0x174A1C5C</string>
+			<key>IOPCIClassMatch</key>
+			<string>0x01080200&amp;0xFFFFFF00</string>
 			<key>IOProbeScore</key>
 			<integer>100000</integer>
 			<key>IOProviderClass</key>

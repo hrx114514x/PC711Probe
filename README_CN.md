@@ -2,12 +2,12 @@
 
 [English](README.md) | 简体中文
 
-用于修复 SK hynix PC711 在旧版 macOS 中初始化时发生 `IONVMeFamily` Identify 超时 Kernel Panic 的自动 Lilu 兼容插件。
+用于修复已测 SK hynix PC711 与 BC711 在旧版 macOS 中初始化时发生 `IONVMeFamily` Identify 超时 Kernel Panic 的自动 Lilu 兼容插件。
 
 > **新发现：PC711 在 macOS 26 已经原生免驱。** 同一块实机 PC711 在 macOS 26.5.1（25F80 / Darwin 25.5.0）中可由 Apple `IONVMeFamily` 正常完成识别、读写和睡眠唤醒，不需要 PC711Probe 或 NVMeFix。PC711Probe 不在 macOS 26 加载。
 
 > [!IMPORTANT]
-> PC711Probe 必须在 NVMe Identify 取得型号字符串之前匹配控制器，因此实际匹配 PCI `1C5C:174A` 与 NVMe class `01:08:02`。SK hynix Gold P31 和 BC711 也有使用这一 PCI 身份的记录。目前只实机验证了固件 `41010C22` 的 `SKHynix_HFS512GDE9X084N`；其他 `1C5C:174A` 设备均属未验证范围，首次测试必须使用可回滚 EFI 并备份数据。
+> 推荐的 `PC711Probe.kext` 匹配 PCI `1C5C:174A` 与 NVMe class `01:08:02`。v1.8.0 同时提供可选的 `PC711ProbeForce.kext`：它忽略 Vendor/Device ID，对机器中每一个 NVMe class `01:08:02` 控制器应用 MSI-X 兼容路径。严禁同时加载两个版本。只在标准版无法匹配已知故障硬盘时使用 Force，并保留可回滚 EFI 和最新数据备份。
 
 > [!NOTE]
 > ## ❤️ 支持 PC711Probe
@@ -18,7 +18,7 @@
 
 ## 已验证结果
 
-PC711Probe 1.7.0 已让同一块实机 PC711 在 macOS 11–15 全部成功启动：macOS 11–14 完成 Recovery 验证，macOS 15.6.1 完成完整安装并从 PC711 进入系统。安装后的系统升级到 macOS 15.7.9 后，又通过了下述存储压力、睡眠唤醒与重启测试。原先约 75 秒后的 Identify/命令超时 KP 不再出现。
+PC711Probe 目前已有一个 PC711（`SKHynix_HFS512GDE9X084N`）和两个 BC711（`HFM512GD3JX016N`、`HFM512GD3JX013N`）测试通过。PC711 完成了 macOS 11–15 全矩阵与下述 macOS 15.7.9 扩展验证；两个 512 GB BC711 也已通过功能测试。原先约 75 秒后的 Identify/命令超时 KP 不再出现。
 
 ![PC711 运行 macOS 15.6.1，并显示 TRIM、PCIe 链路和实测磁盘性能](docs/images/macos15-installed-performance.png)
 
@@ -35,16 +35,20 @@ PC711Probe 1.7.0 已让同一块实机 PC711 在 macOS 11–15 全部成功启�
 | 原生系统 | macOS 26.5.1，Build 25F80，Darwin 25.5.0 |
 | 引导环境 | OpenCore 1.0.8，Lilu 1.7.3 |
 
-## 自动匹配范围
+新增成功 BC711 型号：`HFM512GD3JX016N` 和 `HFM512GD3JX013N`。两者的详细固件、平台与压力测试矩阵尚未记录。
 
-1.7.0 不需要任何启用参数。Kext 加入 OpenCore 后自动运行，对以下控制器应用补丁：
+## 两个并列版本
 
-- PCI Vendor/Device：`1C5C:174A`；
-- NVMe class：`01:08:02`。
+v1.8.0 会构建两个互斥 Kext：
 
-PC711 的型号字符串必须等第一次 Identify 成功后才能读取，因此插件使用 PCI 控制器身份进行预先匹配。这使不同容量和 OEM 型号成为可能，但也意味着插件无法区分已验证的 PC711 与使用同一 PCI 身份的未验证 P31/BC711。其他 PCI ID 的 NVMe 保持 Apple 原始行为。
+| Kext | 匹配方式 | 用途 |
+|---|---|---|
+| `PC711Probe.kext` | PCI `1C5C:174A` 且 NVMe class `01:08:02` | 已知 PC711/BC711 174A 系统的推荐默认版 |
+| `PC711ProbeForce.kext` | 任意 PCI Vendor/Device，只要 NVMe class 为 `01:08:02` | 故障硬盘 PCI ID 不同时的可选后备版 |
 
-插件声明的自动运行范围为 Darwin 20–24（macOS 11–15）。Darwin 25/macOS 26 不加载插件，实测 PC711 在该系统已原生免驱。
+型号字符串必须等第一次 Identify 成功后才能读取，因此两个版本都无法按型号选择。Force 版同时从早期 IOKit personality 和运行时路由中移除 PCI Vendor/Device 限制，因此会影响机器中所有 NVMe 控制器，包括本来不需要补丁的设备。两个 Kext 故意共用同一 Bundle ID，严禁同时启用。
+
+两个版本都不需要启用参数，只在 Darwin 20–24（macOS 11–15）加载。Darwin 25/macOS 26 不加载，实测 PC711 在该系统已原生免驱。
 
 ## 原理
 
@@ -62,15 +66,16 @@ PC711 的型号字符串必须等第一次 Identify 成功后才能读取，因�
 ## 安装
 
 1. 备份现有 EFI，并先使用可回滚的测试 USB。
-2. 确保 Lilu 先于 PC711Probe 加载。
-3. 将 `PC711Probe.kext` 放入 `EFI/OC/Kexts` 并添加到 `Kernel -> Add`：
-   - `BundlePath`: `PC711Probe.kext`
+2. 二选一：通常使用 `PC711Probe.kext`；只在标准 PCI 匹配无法命中故障硬盘时使用 `PC711ProbeForce.kext`。
+3. 确保 Lilu 先于选中的 PC711Probe 版本加载。
+4. 将选中的 Kext 放入 `EFI/OC/Kexts` 并添加到 `Kernel -> Add`：
+   - `BundlePath`: `PC711Probe.kext` 或 `PC711ProbeForce.kext`
    - `ExecutablePath`: `Contents/MacOS/PC711Probe`
    - `PlistPath`: `Contents/Info.plist`
    - `MinKernel`: `20.0.0`
    - `MaxKernel`: `24.99.99`
-4. 停用通过 `_STA=0`、伪造 class/vendor/device 等方式隐藏 PC711 的 AML/SSDT。
-5. 不需要添加任何 PC711Probe 启动参数。
+5. 停用通过 `_STA=0`、伪造 class/vendor/device 等方式隐藏目标硬盘的 AML/SSDT。
+6. 不需要添加任何 PC711Probe 启动参数，严禁同时启用两个版本。
 
 紧急关闭可使用 `-pc711poff`。调试日志可使用 `-pc711pdbg`。
 
@@ -84,13 +89,13 @@ cd PC711Probe
 ./Scripts/verify.sh
 ```
 
-输出：`build/Debug/PC711Probe.kext`
+输出：`build/Debug/PC711Probe.kext` 和 `build/Debug/PC711ProbeForce.kext`
 
 ## 当前验证边界
 
 macOS 11–14 Recovery 已通过启动验证；macOS 15.6.1 已完成完整安装、正常进入系统、namespace/分区发布、PCIe 3.0 x4 链路、TRIM 支持与 S.M.A.R.T. 状态确认，并实测写入 2766.1 MB/s、读取 3005.9 MB/s。在 macOS 15.7.9 中，同一块硬盘又通过了 96 GiB 顺序写入/读取/两次 SHA-256 校验、双路 8 GiB 并行 I/O、2 万个小文件、3 次睡眠唤醒、3 次重启和 APFS 校验，未发现 KP、NVMe 超时、I/O 错误、掉盘或哈希不一致。
 
-上述结果只覆盖一块 `SKHynix_HFS512GDE9X084N`、固件 `41010C22` 和一个 AMD 平台。其他 PC711 容量/固件、Intel 平台及其他 `1C5C:174A` 产品仍未验证。首次使用请保留回滚 EFI 和数据备份，并通过 [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues) 提交独立测试结果。
+最深入的矩阵仍只覆盖一块 PC711（`SKHynix_HFS512GDE9X084N`）、固件 `41010C22` 和一个 AMD 平台。两个 BC711 型号 `HFM512GD3JX016N` 与 `HFM512GD3JX013N` 也已通过功能测试，但其详细固件/平台矩阵与同等扩展负载尚未记录。Force 版已通过编译与静态检查，但尚未单独完成实机验证。首次使用请保留回滚 EFI 和数据备份，并通过 [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues) 提交独立测试结果。
 
 ## 许可
 

@@ -15,8 +15,14 @@
 
 namespace {
 
+#ifndef PC711PROBE_FORCE_VARIANT
+#define PC711PROBE_FORCE_VARIANT 0
+#endif
+
+#if !PC711PROBE_FORCE_VARIANT
 constexpr uint16_t kPC711Vendor {0x1C5C};
 constexpr uint16_t kPC711Device {0x174A};
+#endif
 constexpr uint32_t kNvmeClassRevisionMask {0xFFFFFF00U};
 constexpr uint32_t kNvmeClassRevisionValue {0x01080200U};
 constexpr uint32_t kInterruptTypeMSIX {0x00020000U};
@@ -80,15 +86,21 @@ public:
 	void *compatReserved() { return reserved; }
 };
 
-bool isPC711Device(IOPCIDevice *pci) {
+bool isTargetNVMeDevice(IOPCIDevice *pci) {
 	if (!pci)
 		return false;
 
+	const auto classRevision = pci->configRead32(kIOPCIConfigRevisionID);
+	if ((classRevision & kNvmeClassRevisionMask) != kNvmeClassRevisionValue)
+		return false;
+
+#if PC711PROBE_FORCE_VARIANT
+	return true;
+#else
 	const auto vendor = pci->configRead16(kIOPCIConfigVendorID);
 	const auto device = pci->configRead16(kIOPCIConfigDeviceID);
-	const auto classRevision = pci->configRead32(kIOPCIConfigRevisionID);
-	return vendor == kPC711Vendor && device == kPC711Device &&
-		(classRevision & kNvmeClassRevisionMask) == kNvmeClassRevisionValue;
+	return vendor == kPC711Vendor && device == kPC711Device;
+#endif
 }
 
 IOReturn configurePC711MSIX(IOPCIDevice *pci) {
@@ -229,12 +241,14 @@ OSDefineMetaClassAndStructors(PC711EarlyMSIX, IOService)
 
 IOService *PC711EarlyMSIX::probe(IOService *provider, SInt32 *) {
 	auto pci = OSDynamicCast(IOPCIDevice, provider);
-	if (!isPC711Device(pci))
+	if (!isTargetNVMeDevice(pci))
 		return nullptr;
 
 	const auto result = getKernelVersion() == KernelVersion::BigSur ?
 		reallocateBigSurPC711MSIX(pci) : configurePC711MSIX(pci);
 	pci->setProperty("PC711CompatEarlyMSIXRequested", true);
+	pci->setProperty("PC711CompatForceVariant",
+		PC711PROBE_FORCE_VARIANT != 0);
 	pci->setProperty("PC711CompatEarlyConfigureInterruptsResult",
 		static_cast<unsigned long long>(static_cast<uint32_t>(result)), 32);
 	SYSLOG("probe", "early PC711 MSI-X request completed: %x",
@@ -322,7 +336,7 @@ bool PC711ProbePlugin::isPC711(IOService *controller, IOPCIDevice *&pci) const {
 	if (!pci)
 		return false;
 
-	return isPC711Device(pci);
+	return isTargetNVMeDevice(pci);
 }
 
 IOFilterInterruptEventSource *PC711ProbePlugin::wrapCreateDeviceInterrupt(
@@ -424,6 +438,9 @@ void PC711ProbePlugin::processKext(void *context, KernelPatcher &patcher,
 }
 
 void PC711ProbePlugin::init() {
+#if PC711PROBE_FORCE_VARIANT
+	SYSLOG("probe", "force variant targets every NVMe class 01:08:02 controller");
+#endif
 	const auto error = lilu.onKextLoad(&kextInfo, 1, processKext, this);
 	if (error != LiluAPI::Error::NoError)
 		SYSLOG("probe", "failed to register IONVMeFamily load callback: %d", error);

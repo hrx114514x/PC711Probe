@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.0 — 2026-08-09
+
+- Added `PC711ProbeForce.kext`, an opt-in parallel build that removes the PCI Vendor/Device check while retaining the NVMe class and Darwin 20–24 boundaries.
+- Kept the recommended `PC711Probe.kext` restricted to `1C5C:174A` and NVMe class `01:08:02`.
+- Made both variants share one bundle identifier and documented that they must never be loaded together.
+- Added successful BC711 reports for `HFM512GD3JX016N` and `HFM512GD3JX013N`, extending validation beyond the original PC711.
+- Extended static verification to build, inspect, and distinguish both Kext variants.
+
 ## 1.7.0 — 2026-08-07
 
 - Added a Big Sur-compatible direct MSI-to-MSI-X reallocation path while keeping a single Kext loadable on macOS 11–15.
