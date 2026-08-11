@@ -7,7 +7,7 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 > **New finding: PC711 works natively on macOS 26.** The same physical PC711 was identified by Apple `IONVMeFamily` on macOS 26.5.1 (25F80 / Darwin 25.5.0), with working I/O and sleep/wake. Neither PC711Probe nor NVMeFix was required. PC711Probe does not load on macOS 26.
 
 > [!IMPORTANT]
-> The recommended `PC711Probe.kext` matches PCI `1C5C:174A` with NVMe class `01:08:02`. Version 1.8.0 also provides an opt-in `PC711ProbeForce.kext` that ignores Vendor/Device ID and applies the MSI-X compatibility path to every NVMe class `01:08:02` controller in the machine. Never load both variants. Use Force only when the standard build cannot match a known affected drive, with a rollback EFI and current data backup.
+> The recommended `PC711Probe.kext` matches PCI `1C5C:174A` with NVMe class `01:08:02`. Version 1.8.0 and later also provide an opt-in `PC711ProbeForce.kext` that ignores Vendor/Device ID and applies the MSI-X compatibility path to every NVMe class `01:08:02` controller in the machine. Never load both variants. Use Force only when the standard build cannot match a known affected drive, with a rollback EFI and current data backup.
 
 > [!NOTE]
 > ## ❤️ Support PC711Probe
@@ -39,7 +39,7 @@ Additional successful BC711 model strings: `HFM512GD3JX016N` and `HFM512GD3JX013
 
 ## Two build variants
 
-Version 1.8.0 builds two mutually exclusive Kexts:
+Version 1.8.0 and later build two mutually exclusive Kexts:
 
 | Kext | Matching | Intended use |
 |---|---|---|
@@ -67,7 +67,7 @@ Comparison of older Apple `IONVMeFamily` builds with macOS 26 showed that the ne
 
 1. Back up the current EFI and start with a rollback-capable test USB.
 2. Choose exactly one build: normally `PC711Probe.kext`; use `PC711ProbeForce.kext` only when the standard PCI matcher cannot target the affected drive.
-3. Ensure Lilu loads before the selected PC711Probe variant.
+3. Install Lilu 1.6.1 or newer and ensure it loads before the selected PC711Probe variant. The latest Lilu release is recommended.
 4. Copy the selected Kext to `EFI/OC/Kexts` and add it under `Kernel -> Add`:
    - `BundlePath`: `PC711Probe.kext` or `PC711ProbeForce.kext`
    - `ExecutablePath`: `Contents/MacOS/PC711Probe`
@@ -78,6 +78,8 @@ Comparison of older Apple `IONVMeFamily` builds with macOS 26 showed that the ne
 6. Do not add a PC711Probe activation boot argument and do not enable both variants.
 
 Use `-pc711poff` only as an emergency disable switch. Use `-pc711pdbg` for debug logging.
+
+Safe Mode is not currently validated or enabled. Use a normal boot or Recovery when testing or rolling back PC711Probe.
 
 [Full English installation and rollback guide](docs/INSTALL.en.md)
 

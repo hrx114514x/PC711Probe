@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.1 — 2026-08-12
+
+- Lowered the declared minimum Lilu dependency from 1.7.2 to the actual API floor, 1.6.1.
+- Added static verification for the Lilu dependency in both standard and Force builds.
+- Documented the minimum/recommended Lilu policy and the current Safe Mode validation boundary.
+- Kept device targeting, Darwin 20–24 boundaries, and runtime behavior unchanged.
+
 ## 1.8.0 — 2026-08-09
 
 - Added `PC711ProbeForce.kext`, an opt-in parallel build that removes the PCI Vendor/Device check while retaining the NVMe class and Darwin 20–24 boundaries.

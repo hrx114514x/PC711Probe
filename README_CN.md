@@ -7,7 +7,7 @@
 > **新发现：PC711 在 macOS 26 已经原生免驱。** 同一块实机 PC711 在 macOS 26.5.1（25F80 / Darwin 25.5.0）中可由 Apple `IONVMeFamily` 正常完成识别、读写和睡眠唤醒，不需要 PC711Probe 或 NVMeFix。PC711Probe 不在 macOS 26 加载。
 
 > [!IMPORTANT]
-> 推荐的 `PC711Probe.kext` 匹配 PCI `1C5C:174A` 与 NVMe class `01:08:02`。v1.8.0 同时提供可选的 `PC711ProbeForce.kext`：它忽略 Vendor/Device ID，对机器中每一个 NVMe class `01:08:02` 控制器应用 MSI-X 兼容路径。严禁同时加载两个版本。只在标准版无法匹配已知故障硬盘时使用 Force，并保留可回滚 EFI 和最新数据备份。
+> 推荐的 `PC711Probe.kext` 匹配 PCI `1C5C:174A` 与 NVMe class `01:08:02`。v1.8.0 及后续版本同时提供可选的 `PC711ProbeForce.kext`：它忽略 Vendor/Device ID，对机器中每一个 NVMe class `01:08:02` 控制器应用 MSI-X 兼容路径。严禁同时加载两个版本。只在标准版无法匹配已知故障硬盘时使用 Force，并保留可回滚 EFI 和最新数据备份。
 
 > [!NOTE]
 > ## ❤️ 支持 PC711Probe
@@ -39,7 +39,7 @@ PC711Probe 目前已有一个 PC711（`SKHynix_HFS512GDE9X084N`）和两个 BC71
 
 ## 两个并列版本
 
-v1.8.0 会构建两个互斥 Kext：
+v1.8.0 及后续版本会构建两个互斥 Kext：
 
 | Kext | 匹配方式 | 用途 |
 |---|---|---|
@@ -67,7 +67,7 @@ v1.8.0 会构建两个互斥 Kext：
 
 1. 备份现有 EFI，并先使用可回滚的测试 USB。
 2. 二选一：通常使用 `PC711Probe.kext`；只在标准 PCI 匹配无法命中故障硬盘时使用 `PC711ProbeForce.kext`。
-3. 确保 Lilu 先于选中的 PC711Probe 版本加载。
+3. 安装 Lilu 1.6.1 或更高版本，并确保 Lilu 先于选中的 PC711Probe 版本加载。仍推荐使用最新版 Lilu。
 4. 将选中的 Kext 放入 `EFI/OC/Kexts` 并添加到 `Kernel -> Add`：
    - `BundlePath`: `PC711Probe.kext` 或 `PC711ProbeForce.kext`
    - `ExecutablePath`: `Contents/MacOS/PC711Probe`
@@ -78,6 +78,8 @@ v1.8.0 会构建两个互斥 Kext：
 6. 不需要添加任何 PC711Probe 启动参数，严禁同时启用两个版本。
 
 紧急关闭可使用 `-pc711poff`。调试日志可使用 `-pc711pdbg`。
+
+安全模式目前尚未验证，也不会启用本插件。测试或回滚 PC711Probe 时请使用正常启动或 Recovery。
 
 [完整中文安装与回滚指南](docs/INSTALL.zh-CN.md)
 
