@@ -9,7 +9,7 @@ if [ -f "$lilu_root/Lilu/Headers/kern_api.hpp" ]; then
 	lilu_dir="$lilu_root/Lilu"
 fi
 build_dir="$project_dir/build/Debug"
-version="1.8.0"
+version="1.8.1"
 
 if [ ! -f "$sdk_dir/Headers/IOKit/pci/IOPCIDevice.h" ]; then
 	echo "Missing Vendor/MacKernelSDK" >&2

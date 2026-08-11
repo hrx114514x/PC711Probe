@@ -31,8 +31,9 @@ for artifact in "$binary" "$force_binary"; do
 done
 
 for metadata in "$plist" "$force_plist"; do
-	test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$metadata")" = "1.8.0"
+	test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$metadata")" = "1.8.1"
 	test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$metadata")" = "com.stationk9.driver.PC711Probe"
+	test "$(/usr/libexec/PlistBuddy -c 'Print :OSBundleLibraries:as.vit9696.Lilu' "$metadata")" = "1.6.1"
 	test "$(/usr/libexec/PlistBuddy -c 'Print :OSBundleLibraries:com.apple.iokit.IOPCIFamily' "$metadata")" = "2.9"
 done
 

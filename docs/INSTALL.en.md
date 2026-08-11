@@ -6,7 +6,7 @@ English | [简体中文](INSTALL.zh-CN.md)
 
 - Back up important data and the current EFI.
 - Use an independent USB EFI for the first test and retain another bootable EFI.
-- Ensure Lilu is installed and ordered before PC711Probe.
+- Install Lilu 1.6.1 or newer and order it before PC711Probe. The latest Lilu release is recommended.
 - macOS 26 drives the PC711 natively and does not need this plugin.
 - The standard build matches PCI `1C5C:174A` with NVMe class `01:08:02`. The Force build ignores Vendor/Device ID and affects every NVMe controller in the machine.
 
@@ -48,3 +48,5 @@ If the machine panics, stalls, or shows unexpected devices:
 3. Re-enable the SSDT that previously hid the PC711 if the original behavior is required.
 
 Use `-pc711pdbg` for diagnostics. Normal operation requires no PC711Probe boot argument other than the optional disable or debug switches.
+
+Safe Mode is not currently validated or enabled. Use a normal boot or Recovery for testing and rollback.
