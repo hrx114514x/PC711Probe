@@ -30,7 +30,7 @@ English | [简体中文](INSTALL.zh-CN.md)
 5. Temporarily disable NVMeFix for the first test so results are not mixed.
 6. Validate the configuration with the `ocvalidate` matching the OpenCore version.
 
-> PC711 `SKHynix_HFS512GDE9X084N` and BC711 `HFM512GD3JX016N` / `HFM512GD3JX013N` have reported successful results. The deepest matrix belongs to the PC711. The Force build is not yet separately hardware-validated.
+> PC711 `SKHynix_HFS512GDE9X084N` and BC711 `HFM512GD3JX016N` / `HFM512GD3JX013N` have reported successful results with the standard build. BC511 and Samsung PM991 have passed functional testing with the Force build. The deepest matrix still belongs to the PC711; detailed identifiers, firmware, platforms, and extended workloads have not been recorded for every additional drive.
 
 ## First boot
 

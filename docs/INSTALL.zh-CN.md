@@ -30,7 +30,7 @@
 5. 首次验证时暂时停用 NVMeFix，避免混淆结果。
 6. 使用与 OpenCore 版本匹配的 `ocvalidate` 检查配置。
 
-> PC711 `SKHynix_HFS512GDE9X084N` 与 BC711 `HFM512GD3JX016N` / `HFM512GD3JX013N` 均已报告成功，其中 PC711 的验证矩阵最完整。Force 版尚未单独完成实机验证。
+> PC711 `SKHynix_HFS512GDE9X084N` 与 BC711 `HFM512GD3JX016N` / `HFM512GD3JX013N` 已使用标准版报告成功；BC511 与 Samsung PM991 已使用 Force 版通过功能测试。PC711 的验证矩阵仍最完整，其他新增硬盘尚未全部记录完整标识、固件、平台与扩展负载。
 
 ## 首次启动
 
