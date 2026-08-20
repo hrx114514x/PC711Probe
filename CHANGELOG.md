@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added successful Force-build functional-test reports for SK hynix BC511 and Samsung PM991.
+- Updated the validation boundary: the Force build now has hardware-success reports, while detailed model, firmware, platform, and stress-test matrices remain unrecorded.
+
 ## 1.8.1 — 2026-08-12
 
 - Lowered the declared minimum Lilu dependency from 1.7.2 to the actual API floor, 1.6.1.

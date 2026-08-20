@@ -2,7 +2,7 @@
 
 English | [简体中文](README_CN.md)
 
-An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-timeout kernel panic affecting tested SK hynix PC711 and BC711 NVMe drives on older macOS releases.
+An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-timeout kernel panic affecting tested SK hynix PC711, BC711, and BC511 drives and Samsung PM991 drives on older macOS releases.
 
 > **New finding: PC711 works natively on macOS 26.** The same physical PC711 was identified by Apple `IONVMeFamily` on macOS 26.5.1 (25F80 / Darwin 25.5.0), with working I/O and sleep/wake. Neither PC711Probe nor NVMeFix was required. PC711Probe does not load on macOS 26.
 
@@ -18,7 +18,7 @@ An automatic Lilu compatibility plugin that fixes an `IONVMeFamily` Identify-tim
 
 ## Verified result
 
-PC711Probe has now been reported working with one PC711 (`SKHynix_HFS512GDE9X084N`) and two BC711 models (`HFM512GD3JX016N` and `HFM512GD3JX013N`). The PC711 completed the full macOS 11–15 matrix and extended macOS 15.7.9 validation below; both 512 GB BC711 variants also passed functional testing. The former Identify/command timeout panic after roughly 75 seconds did not recur.
+PC711Probe has now been reported working with one PC711 (`SKHynix_HFS512GDE9X084N`), two BC711 models (`HFM512GD3JX016N` and `HFM512GD3JX013N`), a BC511, and a Samsung PM991. The PC711 completed the full macOS 11–15 matrix and extended macOS 15.7.9 validation below. The BC711 models passed functional testing with the standard build; BC511 and PM991 passed functional testing with the Force build. The former Identify/command timeout panic after roughly 75 seconds did not recur.
 
 ![PC711 running macOS 15.6.1 with TRIM, PCIe link details, and measured disk performance](docs/images/macos15-installed-performance.png)
 
@@ -35,7 +35,7 @@ PC711Probe has now been reported working with one PC711 (`SKHynix_HFS512GDE9X084
 | Native OS | macOS 26.5.1, build 25F80, Darwin 25.5.0 |
 | Boot environment | OpenCore 1.0.8, Lilu 1.7.3 |
 
-Additional successful BC711 model strings: `HFM512GD3JX016N` and `HFM512GD3JX013N`. Their detailed firmware, platform, and stress-test matrices have not yet been recorded.
+Additional successful reports: BC711 `HFM512GD3JX016N` and `HFM512GD3JX013N` with the standard build, plus SK hynix BC511 and Samsung PM991 with the Force build. Detailed model strings, firmware, platforms, and stress-test matrices have not been recorded for every reported drive.
 
 ## Two build variants
 
@@ -44,7 +44,7 @@ Version 1.8.0 and later build two mutually exclusive Kexts:
 | Kext | Matching | Intended use |
 |---|---|---|
 | `PC711Probe.kext` | PCI `1C5C:174A` and NVMe class `01:08:02` | Recommended default for known PC711/BC711 174A systems |
-| `PC711ProbeForce.kext` | Any PCI Vendor/Device with NVMe class `01:08:02` | Opt-in fallback for an affected drive with a different PCI ID |
+| `PC711ProbeForce.kext` | Any PCI Vendor/Device with NVMe class `01:08:02` | Opt-in fallback for a different PCI ID; functionally tested on BC511 and PM991 |
 
 The model string is unavailable until the first Identify succeeds, so neither build can select by model name. The Force build removes the PCI Vendor/Device gate from both the early IOKit personality and the runtime route; it therefore applies to every NVMe controller in the machine, including controllers that may not need the patch. The two Kexts deliberately share one bundle identifier and must never be enabled together.
 
@@ -97,7 +97,7 @@ Outputs: `build/Debug/PC711Probe.kext` and `build/Debug/PC711ProbeForce.kext`
 
 Recovery boot is verified on macOS 11–14. A complete macOS 15.6.1 installation, normal system boot, namespace/partition publication, PCIe 3.0 x4 link, reported TRIM support, S.M.A.R.T. status, and a 2766.1/3005.9 MB/s write/read benchmark are verified on the tested PC711. On macOS 15.7.9, the same drive also passed 96 GiB of sequential write/read/two-pass SHA-256 validation, dual 8 GiB parallel I/O, 20,000 small-file operations, three sleep/wake cycles, three reboots, and APFS verification without a panic, NVMe timeout, I/O error, media loss, or hash mismatch.
 
-The deepest matrix covers one physical PC711 (`SKHynix_HFS512GDE9X084N`), firmware `41010C22`, on one AMD platform. Two BC711 models, `HFM512GD3JX016N` and `HFM512GD3JX013N`, have also passed functional testing, but their detailed firmware/platform matrices and the same extended workload have not yet been recorded. The Force build is compile/static-validated but has not yet received separate hardware validation. Keep a rollback EFI and data backup for the first test, and submit independent results through [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues).
+The deepest matrix covers one physical PC711 (`SKHynix_HFS512GDE9X084N`), firmware `41010C22`, on one AMD platform. Two BC711 models, `HFM512GD3JX016N` and `HFM512GD3JX013N`, have also passed functional testing with the standard build. BC511 and PM991 have passed functional testing with the Force build, providing its first hardware-success reports. Detailed identifiers, firmware/platform matrices, and the same extended workload have not yet been recorded for those additional drives. Keep a rollback EFI and data backup for the first test, and submit independent results through [GitHub Issues](https://github.com/hrx114514x/PC711Probe/issues).
 
 ## License
 
