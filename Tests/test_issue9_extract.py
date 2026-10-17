@@ -57,7 +57,9 @@ class ExtractTests(unittest.TestCase):
                          [0x15B32, 0x15AF7, 0x15ABC, 0x15A65])
 
     def test_standalone(self):
-        self.assertEqual(tool.extract(image(False), ADDRESS)["module_file_offset"], "0x0")
+        result = tool.extract(image(False), ADDRESS)
+        self.assertEqual(result["module_file_offset"], "0x0")
+        self.assertIn("not necessarily", result["uuid_scope"])
 
     def test_fingerprint_mismatch(self):
         data = image()

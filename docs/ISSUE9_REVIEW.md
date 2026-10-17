@@ -12,7 +12,7 @@ The diagnostic uses public PCI reads and registry IDs, with a bounded convention
 
 Build and inspect the separate diagnostic on macOS with `sh Diagnostics/verify-macos.sh`. macOS CI has successfully linked the diagnostic as an x86_64 kext and passed the compatibility builds and 734 executable policy/capability tests. A linked artifact is still a review experiment: exact Apple ABI and hardware validation remain outstanding. Keep the old diagnostic, NVMeFix, PC711Probe and Force disabled during a first isolated diagnostic test. Never hot-unload an active Lilu route.
 
-For the next static investigation, `Scripts/issue9-extract.py` reads an existing, uncompressed x86_64 Mach-O/kernel fileset and extracts four bounded error-handler windows. It requires the exact SHA-256 of the supplied 580-byte InitializePCI excerpt, so it refuses other builds instead of guessing their call targets. It records the input hash and module UUID; it does not boot macOS or modify the image. The original report's unslid address is `0xffffff80025f5aa4`:
+For the next static investigation, `Scripts/issue9-extract.py` reads an existing, uncompressed x86_64 Mach-O/kernel fileset and extracts four bounded error-handler windows. It requires the exact SHA-256 of the supplied 580-byte InitializePCI excerpt, so it refuses other builds instead of guessing their call targets. It records the input hash and selected Mach-O UUID; for a non-fileset kernel image, that UUID belongs to the root image and is not necessarily the NVMe bundle UUID. It does not boot macOS or modify the image. The original report's unslid address is `0xffffff80025f5aa4`:
 
 ```sh
 python3 Scripts/issue9-extract.py /path/to/uncompressed-kernel-or-collection \

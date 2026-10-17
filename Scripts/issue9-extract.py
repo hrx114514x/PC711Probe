@@ -149,6 +149,8 @@ def extract(data, address):
                             sha256=hashlib.sha256(window).hexdigest()))
     return dict(schema=1, input_sha256=hashlib.sha256(data).hexdigest(),
                 module_file_offset=hex(module), module_uuid=uuid(data, module),
+                uuid_scope=("IONVMeFamily fileset entry" if header(data, 0)[3] == MH_FILESET
+                            else "root Mach-O; not necessarily the NVMe bundle UUID"),
                 initialize_pci_address=hex(address), initialize_pci_file_offset=hex(offset),
                 initialize_pci_segment=segment, initialize_pci_sha256=digest,
                 window_length=192, windows=windows,
