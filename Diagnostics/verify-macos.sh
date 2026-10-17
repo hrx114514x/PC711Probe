@@ -12,8 +12,15 @@ nm "$binary" | grep -q ' __stop$'
 nm "$binary" | grep -q ' _PM9C1aReadOnly_kern_start$'
 nm "$binary" | grep -q ' _PM9C1aReadOnly_kern_stop$'
 nm -u "$binary" | grep -q '__ZN7LiluAPI10onKextLoad'
-if nm -u "$binary" | grep -E 'configWrite|configureInterrupts|mapDeviceMemory|allocateDeviceInterrupts'; then
+# plugin_start.o emits the IOService subclass vtable, which references inherited
+# IOService::mapDeviceMemoryWithIndex even though our diagnostic never calls it.
+# Inspect the diagnostic implementation object, not inherited vtable imports.
+if nm -u "$out/diag.o" | grep -E 'configWrite|configureInterrupts|mapDeviceMemory|allocateDeviceInterrupts'; then
     echo 'Unexpected hardware mutation or mapping dependency in diagnostic' >&2
+    exit 1
+fi
+if grep -E 'configWrite|configureInterrupts|mapDeviceMemory|allocateDeviceInterrupts' "$root/Diagnostics/PM9C1aReadOnly.cpp"; then
+    echo 'Unexpected hardware mutation or mapping API in diagnostic source' >&2
     exit 1
 fi
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = 'com.stationk9.diagnostic.PM9C1aReadOnly'
