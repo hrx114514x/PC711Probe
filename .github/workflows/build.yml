@@ -16,6 +16,8 @@ jobs:
           submodules: recursive
       - name: Build and run static checks
         run: ./Scripts/verify.sh
+      - name: Test offline Issue 9 evidence extraction
+        run: python3 -m unittest discover -s Tests -p test_issue9_extract.py -v
       - name: Build and inspect Issue 9 read-only diagnostic
         run: sh Diagnostics/verify-macos.sh
       - name: Upload review-only diagnostic and verification records
