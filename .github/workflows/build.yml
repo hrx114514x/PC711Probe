@@ -16,3 +16,15 @@ jobs:
           submodules: recursive
       - name: Build and run static checks
         run: ./Scripts/verify.sh
+      - name: Build and inspect Issue 9 read-only diagnostic
+        run: sh Diagnostics/verify-macos.sh
+      - name: Upload review-only diagnostic and verification records
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue9-review-only-${{ github.sha }}
+          path: |
+            build/Issue9Review/PM9C1aReadOnly.kext
+            build/Issue9Review/undefined-symbols.txt
+            build/Issue9Review/REVIEW_ONLY.txt
+            docs/ISSUE9_REVIEW.md
+          if-no-files-found: error
