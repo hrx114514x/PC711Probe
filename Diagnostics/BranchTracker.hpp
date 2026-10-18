@@ -8,6 +8,7 @@ enum : unsigned { Provider = 1, Map = 2, Address = 4, Mappers = 8 };
 struct Frame {
     uintptr_t thread {0};
     uintptr_t controller {0};
+    uintptr_t provider {0};
     bool target {false};
     uint64_t call {0}, cid {0}, pid {0};
     unsigned branches {0};

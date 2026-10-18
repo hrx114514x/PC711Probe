@@ -5,8 +5,8 @@
 <key>CFBundleExecutable</key><string>PM9C1aReadOnly</string>
 <key>CFBundleName</key><string>PM9C1aReadOnly</string>
 <key>CFBundlePackageType</key><string>KEXT</string>
-<key>CFBundleVersion</key><string>0.2.0</string>
-<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>0.3.0</string>
+<key>CFBundleShortVersionString</key><string>0.3.0</string>
 <key>OSBundleRequired</key><string>Root</string>
 <key>IOKitPersonalities</key><dict><key>PM9C1aReadOnly</key><dict>
 <key>CFBundleIdentifier</key><string>com.stationk9.diagnostic.PM9C1aReadOnly</string>

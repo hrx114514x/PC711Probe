@@ -12,7 +12,7 @@ compile_cpp() {
         -fno-exceptions -fno-rtti -fno-asynchronous-unwind-tables \
         -isystem "$sdk/Headers" -isystem "$lilu" \
         -DKERNEL -DKERNEL_PRIVATE -D__KERNEL__ -DMACH_ASSERT=1 \
-        -DPRODUCT_NAME=PM9C1aReadOnly -DMODULE_VERSION=0.2.0 \
+        -DPRODUCT_NAME=PM9C1aReadOnly -DMODULE_VERSION=0.3.0 \
         -Werror -Wall -Wextra -Wno-deprecated-declarations -c "$1" -o "$2"
 }
 compile_cpp "$root/Diagnostics/PM9C1aReadOnly.cpp" "$out/diag.o"

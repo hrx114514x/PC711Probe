@@ -30,7 +30,7 @@ jobs:
             build/Issue9Review/PM9C1aReadOnly.kext
             build/Issue9Review/undefined-symbols.txt
             build/Issue9Review/REVIEW_ONLY.txt
-            build/Issue9Review/PM9C1aReadOnly-0.2.0-REVIEW_ONLY.tar.gz
+            build/Issue9Review/PM9C1aReadOnly-0.3.0-REVIEW_ONLY.tar.gz
             docs/ISSUE9_REVIEW.md
             docs/ISSUE9_RUNTIME.md
           if-no-files-found: error

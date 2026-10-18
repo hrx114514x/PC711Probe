@@ -4,6 +4,7 @@
 // queue commands, or replacement success results. Not a storage compatibility fix.
 #include <IOKit/IOService.h>
 #include <IOKit/IOLocks.h>
+#include <IOKit/IOMemoryDescriptor.h>
 #include <IOKit/IOFilterInterruptEventSource.h>
 #include <IOKit/pci/IOPCIDevice.h>
 #include <IOKit/pci/IOPCIFamilyDefinitions.h>
@@ -11,6 +12,7 @@
 #include <libkern/c++/OSDictionary.h>
 #include <libkern/c++/OSNumber.h>
 #include <libkern/c++/OSString.h>
+#include <libkern/c++/OSArray.h>
 #include <kern/thread.h>
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_patcher.hpp>
@@ -19,6 +21,7 @@
 #include "ReadOnlyPolicy.hpp"
 #include "BranchTracker.hpp"
 #include "ExactFingerprints.hpp"
+#include "ResourcePolicy.hpp"
 
 namespace {
 using BoolMethod = bool (*)(IOService *);
@@ -33,10 +36,114 @@ MapperErrorMethod originalMapperError {nullptr};
 IOSimpleLock *observationLock {nullptr};
 BranchObservation::Tracker<32> observations;
 unsigned installedRoutes {0};
+bool inactiveSelectorVerified {false};
 uint64_t sequence {0};
 const char *path = "/System/Library/Extensions/IONVMeFamily.kext/Contents/MacOS/IONVMeFamily";
 KernelPatcher::KextInfo info {"com.apple.iokit.IONVMeFamily", &path, 1,
     {true}, {}, KernelPatcher::KextInfo::Unloaded};
+
+bool putNumber(OSDictionary *dict, const char *key, uint64_t value) {
+    auto number=OSNumber::withNumber(value,64);
+    if (!number) return false;
+    const bool ok=dict->setObject(key,number);
+    number->release();
+    return ok;
+}
+
+IOPCIDevice *copyUpstreamPCI(IOPCIDevice *pci, unsigned &status) {
+    status=0;
+    IORegistryEntry *entry=pci;
+    entry->retain();
+    for (unsigned depth=0; depth<8; ++depth) {
+        auto parents=entry->getParentIterator(gIOServicePlane);
+        auto parent=parents ? OSDynamicCast(IORegistryEntry,parents->getNextObject()) : nullptr;
+        const bool ambiguous=parents && parents->getNextObject()!=nullptr;
+        if (ambiguous) parent=nullptr;
+        if (parent) parent->retain();
+        OSSafeReleaseNULL(parents);
+        entry->release();
+        if (!parent) { status=ambiguous ? 3 : 2; return nullptr; }
+        auto device=OSDynamicCast(IOPCIDevice,parent);
+        if (device) { status=1; return device; } // Retained by this helper.
+        entry=parent;
+    }
+    entry->release();
+    status=4;
+    return nullptr;
+}
+
+void resources(IOPCIDevice *pci, uint64_t call, uint64_t cid, const char *key) {
+    // Read the existing property table in one shallow retained copy. Do not ask
+    // IOPCIDevice getters to resolve resources or interrupt arrays on our behalf.
+    auto properties=pci->IORegistryEntry::dictionaryWithProperties();
+    auto dict=OSDictionary::withCapacity(32);
+    if (!dict) { OSSafeReleaseNULL(properties); return; }
+    auto memory=properties ? properties->getObject(gIODeviceMemoryKey) : nullptr;
+    auto array=OSDynamicCast(OSArray,memory);
+    struct Reader {
+        OSArray *array;
+        unsigned count() { return array ? array->getCount() : 0; }
+        bool descriptor(unsigned index, uint64_t &tag, uint64_t &length) {
+            auto value=OSDynamicCast(IOMemoryDescriptor,array->getObject(index));
+            if (!value) return false;
+            tag=value->getTag(); length=value->getLength();
+            return true;
+        }
+    } reader {array};
+    auto summary=ResourceObservation::summarize(reader);
+    const bool countStable=!array || array->getCount()==summary.count;
+    const auto identity=pci->configRead32(0);
+    const auto low=pci->configRead32(0x10), high=pci->configRead32(0x14);
+    auto controllers=properties ? OSDynamicCast(OSArray,properties->getObject(gIOInterruptControllersKey)) : nullptr;
+    auto specifiers=properties ? OSDynamicCast(OSArray,properties->getObject(gIOInterruptSpecifiersKey)) : nullptr;
+    bool complete=true;
+    auto put=[&](const char *name,uint64_t value) { complete=putNumber(dict,name,value) && complete; };
+    put("Schema",3); put("Call",call); put("ControllerID",cid); put("ProviderID",pci->getRegistryEntryID());
+    put("ProviderInactive",pci->isInactive());
+    put("InactiveSelectorVerified",__atomic_load_n(&inactiveSelectorVerified,__ATOMIC_ACQUIRE));
+    put("SnapshotReady",properties!=nullptr);
+    put("MemoryKind",!memory ? 0 : array ? 1 : 2); // 0 absent, 1 array, 2 other type.
+    put("MemoryCount",summary.count); put("Scanned",summary.scanned);
+    put("CountStable",countStable); put("ConfigIdentity",identity);
+    put("InvalidObjects",summary.invalid); put("Truncated",summary.truncated);
+    put("BAR0Matches",summary.matches); put("BAR0Tag",summary.firstTag); put("BAR0Length",summary.firstLength);
+    put("PCICommand",pci->configRead16(0x04)); put("BAR0Low",low); put("BAR0High",high);
+    put("BARValid",ResourceObservation::usableBarEncoding(low) && identity==0xA80D144DU);
+    put("BARBase",ResourceObservation::barBase(low,high));
+    put("IRQControllersPresent",controllers!=nullptr); put("IRQControllers",controllers ? controllers->getCount() : 0);
+    put("IRQSpecifiersPresent",specifiers!=nullptr); put("IRQSpecifiers",specifiers ? specifiers->getCount() : 0);
+    put("BDF",(pci->getBusNumber()<<8)|(pci->getDeviceNumber()<<3)|pci->getFunctionNumber());
+    if (complete) pci->setProperty(key,dict);
+    dict->release();
+    OSSafeReleaseNULL(properties);
+
+    // Capture the nearest upstream PCI node without changing any bridge window.
+    unsigned parentStatus=0;
+    auto parent=copyUpstreamPCI(pci,parentStatus);
+    auto bridge=OSDictionary::withCapacity(20);
+    if (bridge) {
+        bool ok=putNumber(bridge,"Call",call) && putNumber(bridge,"ProviderID",pci->getRegistryEntryID()) &&
+            putNumber(bridge,"ParentFound",parent!=nullptr) && putNumber(bridge,"ParentSearch",parentStatus);
+        if (parent) {
+            const auto parentIdentity=parent->configRead32(0), revision=parent->configRead32(8);
+            const bool isBridge=(revision & 0xFFFF0000U)==0x06040000U && parentIdentity!=0xFFFFFFFFU;
+            const auto base=isBridge ? parent->configRead16(0x20) : 0;
+            const auto limit=isBridge ? parent->configRead16(0x22) : 0;
+            const bool unique=summary.matches==1 && !summary.truncated && !summary.invalid && countStable && identity==0xA80D144DU;
+            ok=putNumber(bridge,"ParentID",parent->getRegistryEntryID()) &&
+                putNumber(bridge,"Identity",parentIdentity) && putNumber(bridge,"ClassRevision",revision) &&
+                putNumber(bridge,"BDF",(parent->getBusNumber()<<8)|(parent->getDeviceNumber()<<3)|parent->getFunctionNumber()) &&
+                putNumber(bridge,"PCICommand",parent->configRead16(4)) && putNumber(bridge,"IsPCIBridge",isBridge) &&
+                putNumber(bridge,"MemoryBaseRaw",base) && putNumber(bridge,"MemoryLimitRaw",limit) &&
+                putNumber(bridge,"MemoryBase",isBridge ? ResourceObservation::bridgeBase(base) : 0) &&
+                putNumber(bridge,"MemoryLimit",isBridge ? ResourceObservation::bridgeLimit(limit) : 0) &&
+                putNumber(bridge,"BAR0WindowFit",isBridge ? ResourceObservation::fit(low,high,summary.firstLength,unique,base,limit) : 0) && ok;
+        }
+        if (ok) pci->setProperty("PM9C1aROLastBridge",bridge);
+        bridge->release();
+    }
+    OSSafeReleaseNULL(parent);
+}
 
 bool permitted() {
     return ReadOnlyPolicy::allowed(version_major, version_minor, version_revision,
@@ -97,12 +204,15 @@ void recordExit(unsigned branch, IOService *controller = nullptr) {
     uint64_t call = frame ? frame->call : 0;
     uint64_t cid = frame ? frame->cid : 0;
     uint64_t pid = frame ? frame->pid : 0;
+    uintptr_t pciPointer = frame ? frame->provider : 0;
     IOSimpleLockUnlockEnableInterrupt(observationLock, state);
     if (call) {
         auto seq = __sync_add_and_fetch(&sequence, 1);
         SYSLOG("diag", "seq=%llu call=%llu cid=%llu pid=%llu observedExitMask=%u",
             static_cast<unsigned long long>(seq), static_cast<unsigned long long>(call),
             static_cast<unsigned long long>(cid), static_cast<unsigned long long>(pid), branch);
+        if (branch==BranchObservation::Map && pciPointer)
+            resources(reinterpret_cast<IOPCIDevice *>(pciPointer),call,cid,"PM9C1aROResAtMapExit");
     }
 }
 
@@ -145,6 +255,7 @@ bool wrapPCI(IOService *controller) {
     BranchObservation::Frame frame;
     frame.thread = reinterpret_cast<uintptr_t>(current_thread());
     frame.controller = reinterpret_cast<uintptr_t>(controller);
+    frame.provider = reinterpret_cast<uintptr_t>(pci);
     frame.target = pci != nullptr;
     if (pci) {
         pci->retain();
@@ -154,6 +265,7 @@ bool wrapPCI(IOService *controller) {
         SYSLOG("diag", "call=%llu controllerClass=%s exactFingerprint=1",
             static_cast<unsigned long long>(frame.call), controller->getMetaClass()->getClassName());
         snapshot(pci, frame.call, "before");
+        resources(pci,frame.call,frame.cid,"PM9C1aROResBefore");
     }
     auto state = IOSimpleLockLockDisableInterrupt(observationLock);
     const bool tracked = observations.push(frame);
@@ -242,6 +354,15 @@ void process(void *, KernelPatcher &patcher, size_t index, mach_vm_address_t bas
         SYSLOG("diag", "exact error-handler fingerprint mismatch; no routes installed");
         return;
     }
+    // Independently identify the two direct selector calls on this running
+    // kernel. Missing symbols leave the meaning unverified; no new hook is used.
+    patcher.clearError();
+    const auto inactive=patcher.solveSymbol(KernelPatcher::KernelID,"__ZNK9IOService10isInactiveEv");
+    const bool verified=inactive && patcher.getError()==KernelPatcher::Error::NoError &&
+        callTarget(addresses[0],0x41)==inactive && callTarget(addresses[0],0x77)==inactive;
+    __atomic_store_n(&inactiveSelectorVerified,verified,__ATOMIC_RELEASE);
+    patcher.clearError();
+    SYSLOG("diag","inactive selector symbol verified=%d",verified);
     KernelPatcher::RouteRequest routes[] {
         {nullptr, wrapPCI, originalPCI}, {nullptr, wrapMappers, originalMappers},
         {nullptr, wrapInterrupt, originalInterrupt},

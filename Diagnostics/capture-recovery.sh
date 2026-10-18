@@ -14,6 +14,7 @@ capture() {
 capture version sw_vers
 capture kernel uname -a
 capture boot-args nvram boot-args
+capture effective-boot-args sysctl kern.bootargs
 capture kexts kmutil showloaded
 capture kextstat kextstat
 capture dmesg dmesg

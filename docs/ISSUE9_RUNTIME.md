@@ -1,6 +1,28 @@
-# PM9C1aReadOnly 0.2.0 runtime experiment
+# PM9C1aReadOnly 0.3.0 runtime experiment
 
 The intended end result for Issue 9 is a PM9C1a-specific compatibility fix supporting physical-disk detection, installation, boot and normal storage operation. This diagnostic is the next measurement used to choose that fix; it does not bypass InitializePCI failures or claim the disk is working.
+
+## Hardware result and the next measurement
+
+The [reporter's 0.2.0 test](https://github.com/hrx114514x/PC711Probe/issues/9#issuecomment-6251999746) on Sequoia 15.6 / Darwin 24.6.0 records InitializePCI `Result=0`, `ObservedExitMask=2`, `Tracked=1`, `InstalledRoutes=127`, Call 3, ControllerID 4294968412 and ProviderID 4294968319. The screenshots agree on this complete observation: the original map-unavailable helper was reached. This does not yet distinguish a missing BAR0 descriptor, a failed new map, or an unavailable saved map. The comment transcribes the interrupt result as 0, whereas the attached photos show 1; do not use that discrepancy as evidence of interrupt failure. Even a non-null event source does not prove interrupt delivery.
+
+Version 0.3.0 keeps the same seven routes and code fingerprints, adding passive snapshots before InitializePCI and at its already-observed map exit. It reads the existing registry property table, descriptor tags/lengths, raw PCI configuration, provider lifecycle state and the nearest upstream PCI bridge window. It does not request a new mapping, interrupt resolution, resource construction or PCI configuration change. The new version has not yet been tested on the reporter's hardware.
+
+`PM9C1aROResBefore` and `PM9C1aROResAtMapExit` contain:
+
+- `Schema=3`, `Call`, `ControllerID`, `ProviderID`: match these to the completed InitializePCI observation from the same boot.
+- `SnapshotReady`: 1 means the existing property-table copy succeeded. `MemoryKind`: 0 = absent, 1 = array, 2 = unexpected type.
+- `MemoryCount`, `Scanned`, `CountStable`, `InvalidObjects`, `Truncated`: qualify the bounded scan, at most 64 descriptors. An incomplete or malformed scan is inconclusive.
+- `BAR0Matches`, `BAR0Tag`, `BAR0Length`: descriptors whose tag's low byte is 0x10. Length is from the descriptor, not a destructive PCI BAR sizing probe. Duplicate matches are ambiguous.
+- `ConfigIdentity`, `PCICommand`, `BAR0Low`, `BAR0High`, `BARBase`, `BARValid`, `BDF`: current PCI reads. `BARValid` validates identity and memory-BAR encoding, not usable allocation or reachability. A zero base is not accepted for window assessment.
+- `IRQControllersPresent`/`IRQControllers`, `IRQSpecifiersPresent`/`IRQSpecifiers`: counts of **already-cached** arrays. These do not prove interrupt allocation or delivery. The property table is copied directly because IOPCIDevice's interrupt property getter can trigger resolution.
+- `ProviderInactive`: a lifecycle-state sample, not a record of the original selector's return. `InactiveSelectorVerified=1` means both direct calls at InitializePCI +0x41/+0x77 resolved to the running kernel's `IOService::isInactive` symbol. Missing symbol/mismatch leaves 0 without adding any hook or disabling the existing observation.
+
+The [Intel Tahoe reference](https://github.com/hrx114514x/PC711Probe/actions/runs/39178373866) identifies its corresponding selector as `IOService::isInactive`. In both captured control-flow sequences, a true second selector uses the saved map and a false selector calls the mapping slot. Sequoia's symbol identity remains conditional on the runtime check above. A before/exit sample cannot alone establish the exact state at an intervening call.
+
+`PM9C1aROLastBridge` describes the nearest upstream PCI node (up to eight parent steps, rejecting ambiguous multiple parents). `ParentSearch`: 1 = found, 2 = no parent/iterator unavailable, 3 = ambiguous, 4 = depth limit. `IsPCIBridge=1` qualifies the non-prefetchable memory window. `BAR0WindowFit`: 0 = not assessed, 1 = descriptor-sized BAR range inside that window, 2 = outside. Assessment requires a unique complete descriptor scan, matching identity, valid non-prefetchable BAR encoding, nonzero base/length, valid bridge encoding and no arithmetic overflow. This compares raw configuration with descriptor length; it does not prove descriptor physical backing, upstream routing through every bridge, or successful mapping. Bridge observations overwrite on each snapshot; match `Call`/`ProviderID`.
+
+These are separately read observations, not an atomic PCI/topology transaction. Allocation failure can omit a dictionary; stale dictionaries must not be mixed across calls. A complete scan with no BAR0 descriptor directs investigation to resource publication. A unique nonzero descriptor moves attention to mapping and lifecycle selection, but does not itself prove that the original mapping call ran and failed. An outside bridge window is a resource-consistency lead, not permission to write addresses copied from Linux.
 
 ## New findings from the detailed attachment
 
@@ -41,7 +63,7 @@ Use a single nonzero exit bit with `Result=0`, valid IDs, `Tracked=1` and full i
 
 ## Test and capture
 
-Use the separate test EFI with Lilu 1.7.3 or newer. Keep the Golden EFI available unchanged. Disable PC711Probe, Force, NVMeFix and the old PM9C1aDiag in the test configuration. Replace any previous PM9C1aReadOnly version with **0.2.0**; do not load both.
+Use the separate test EFI with Lilu 1.7.3 or newer. Keep the Golden EFI available unchanged. Disable PC711Probe, Force, NVMeFix and the old PM9C1aDiag in the test configuration. Replace any previous PM9C1aReadOnly version with **0.3.0**; do not load both. Preserve the activation that already worked; another NVRAM reset is not part of this experiment.
 
 | OpenCore field | Value |
 | --- | --- |
@@ -53,9 +75,21 @@ Use the separate test EFI with Lilu 1.7.3 or newer. Keep the Golden EFI availabl
 | Explicit activation | `-pm9c1adiag` |
 | Disable argument | `-pm9c1adiagoff` takes precedence |
 
-Use the CI artifact's review-only tar archive to preserve Unix permissions, or build with `sh Diagnostics/verify-macos.sh`. No installation is performed by the build scripts. The 0.2.0 binary has been compiled and statically checked; no hardware test is implied.
+Use the CI artifact's `PM9C1aReadOnly-0.3.0-REVIEW_ONLY.tar.gz` to preserve Unix permissions, or build with `sh Diagnostics/verify-macos.sh`. No installation is performed by the build scripts. The earlier 0.2.0 hardware observation does not validate the added 0.3.0 snapshot implementation.
 
 After booting Recovery, run `sh Diagnostics/capture-recovery.sh`. It records loaded kext versions, IORegistry, unified-log output, a best-effort dmesg snapshot and physical-disk listing under `/tmp`. The existing Apple expression strings may already identify the failure in baseline logs; the new dictionary is intended to retain the branch observation if boot logs are unavailable. Copy evidence to separate media before reboot and review serial/SMBIOS information before sharing.
+
+When USB storage is unavailable, photographs are sufficient for this stage. Run each command separately and photograph its entire output (split long output across photos). `tr` places one dictionary field per line; it does not alter the evidence.
+
+```sh
+sysctl kern.bootargs
+kmutil showloaded | grep PM9C1aReadOnly
+ioreg -lw0 | grep 'PM9C1aROLastInitializePCI' | tr ',' '\n'
+ioreg -lw0 | grep 'PM9C1aROResAtMapExit' | tr ',' '\n'
+ioreg -lw0 | grep 'PM9C1aROLastBridge' | tr ',' '\n'
+```
+
+If a resource inconsistency is visible, also photograph `PM9C1aROResBefore` using the same command pattern. Retain the `Call`, IDs and qualification fields; a cropped BAR0Matches value alone is insufficient.
 
 If boot or input regresses, return to the Golden EFI and disable the experimental entry; do not hot-unload it. Fingerprint mismatch, missing properties or incomplete hooks should be reported with the capture rather than worked around by relaxing checks. No additional VMD, BAR, IOMMU or disk-writing experiment is part of this measurement.
 

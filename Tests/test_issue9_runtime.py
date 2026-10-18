@@ -59,5 +59,17 @@ class RuntimeEvidence(unittest.TestCase):
         original=bytes.fromhex((ROOT/'Tests/fixtures/InitializePCI-580.hex').read_text())
         self.assertEqual(code[position:position+580],original)
 
+    def test_map_selector_call_sites_share_exact_target(self):
+        code=bytes.fromhex((ROOT/'Tests/fixtures/InitializePCI-580.hex').read_text())
+        base=int(D['initialize_pci_address'],16)
+        for offset in (0x41,0x77):
+            self.assertEqual(code[offset],0xE8)
+            target=base+offset+5+struct.unpack_from('<i',code,offset+1)[0]
+            self.assertEqual(target,0xFFFFFF8000AD5640)
+        # The second selector's true path uses the saved map; false calls the
+        # mapping slot. Its symbolic identity still requires runtime verification.
+        self.assertEqual(code[0x7C:0x80],bytes.fromhex('84c07409'))
+        self.assertEqual(code[0x9A:0xA0],bytes.fromhex('ff9008090000'))
+
 
 if __name__=='__main__': unittest.main()
