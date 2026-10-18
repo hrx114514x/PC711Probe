@@ -16,10 +16,11 @@ capture kernel uname -a
 capture boot-args nvram boot-args
 capture kexts kmutil showloaded
 capture kextstat kextstat
+capture dmesg dmesg
 capture physical-disks diskutil list physical
 capture nvme ioreg -r -c IONVMeController -t -l -w0 -x
 capture pci ioreg -r -c IOPCIDevice -t -l -w0 -x
 capture logs log show --last boot --style compact --info --debug --predicate \
-    '(process == "kernel") AND (eventMessage CONTAINS[c] "PM9C1a" OR eventMessage CONTAINS[c] "IONVMe" OR eventMessage CONTAINS[c] "PC711")'
+    '(process == "kernel") AND (eventMessage CONTAINS[c] "PM9C1a" OR eventMessage CONTAINS[c] "IONVMe" OR eventMessage CONTAINS[c] "AppleNVMe" OR eventMessage CONTAINS[c] "fIOMapRegs" OR eventMessage CONTAINS[c] "fBaseAddress" OR eventMessage CONTAINS[c] "PC711")'
 printf 'Saved to %s. Copy to separate evidence media before reboot; review privacy before sharing.\n' "$out"
 printf 'Missing logs or markers do not prove a branch was not executed.\n'

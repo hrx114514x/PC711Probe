@@ -25,13 +25,25 @@ if grep -E 'configWrite|configureInterrupts|mapDeviceMemory|allocateDeviceInterr
 fi
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = 'com.stationk9.diagnostic.PM9C1aReadOnly'
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")" = 'PM9C1aReadOnly'
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" = '0.2.0'
+test "$(/usr/libexec/PlistBuddy -c 'Print :OSBundleLibraries:as.vit9696.Lilu' "$plist")" = '1.7.3'
+xcrun clang++ -std=c++14 -Wall -Wextra -Werror -pthread \
+    "$root/Tests/issue9_tracking.cpp" -o "$out/tracking-test"
+"$out/tracking-test"
 cat > "$out/REVIEW_ONLY.txt" <<'EOF'
-PM9C1aReadOnly is a diagnostic experiment, not a storage compatibility fix.
+PM9C1aReadOnly 0.2.0 observes exact InitializePCI exits; it is not a storage compatibility fix.
 Native compilation and static inspection do not establish bootability or hardware safety.
 Enable only after reviewing docs/ISSUE9_REVIEW.md and the exact Apple binary ABI.
-Darwin 24.6.0, PCI 144D:A80D, NVMe class 01:08:02, explicit -pm9c1adiag.
+Darwin 24.6.0, exact verified Apple code bytes, Lilu 1.7.3+, PCI 144D:A80D,
+NVMe class 01:08:02, explicit -pm9c1adiag. Fingerprint/range mismatch installs no routes.
 -pm9c1adiagoff takes precedence. Use a separate rollback-capable USB EFI.
 Do not combine this with PC711Probe, Force, NVMeFix or the old PM9C1aDiag.
 No hardware tests have been performed for this artifact.
+Inspect PM9C1aROLastInitializePCI: Result=0 and ObservedExitMask 1=provider,
+2=map unavailable, 4=virtual address zero, 8=mapper false. Zero is inconclusive.
+InstalledRoutes=127 means all seven routes installed; Tracked=1 means this call was tracked.
 EOF
+cp "$root/docs/ISSUE9_RUNTIME.md" "$out/ISSUE9_RUNTIME.md"
+tar -czf "$out/PM9C1aReadOnly-0.2.0-REVIEW_ONLY.tar.gz" -C "$out" \
+    PM9C1aReadOnly.kext REVIEW_ONLY.txt ISSUE9_RUNTIME.md undefined-symbols.txt
 echo 'Issue 9 diagnostic native build and static inspection passed'
