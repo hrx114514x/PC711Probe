@@ -1,0 +1,23 @@
+name: Inspect Tahoe Intel NVMe reference
+on:
+  push:
+    branches: [research/tahoe-reference-20261018]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: macos-26-intel
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect existing system NVMe code without loading any kext
+        run: |
+          python3 -m venv /tmp/nvme-reference-venv
+          /tmp/nvme-reference-venv/bin/pip install --quiet capstone==5.0.6
+          /tmp/nvme-reference-venv/bin/python Scripts/inspect-tahoe-reference.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tahoe-intel-reference-${{ github.sha }}
+          path: build/TahoeReference/*.json
+          if-no-files-found: error
