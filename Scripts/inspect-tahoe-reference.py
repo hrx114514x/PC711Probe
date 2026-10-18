@@ -45,7 +45,7 @@ def decode(window):
         if instruction.group(CS_GRP_RET) or instruction.mnemonic in ('ud2','int3'):continue
         if instruction.group(CS_GRP_JUMP):
             if instruction.operands and instruction.operands[0].type==X86_OP_IMM:
-                todo.append(instruction.operands[0].imm)
+                todo.append(instruction.operands[0].imm & 0xFFFFFFFFFFFFFFFF)
             else:limits.append('indirect tail at '+hex(address))
             if instruction.id==X86_INS_JMP:continue
         todo.append(address+instruction.size)
@@ -55,6 +55,9 @@ def decode(window):
 
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
+    fixture=(ROOT/'Tests/fixtures/InitializePCI-580.hex').read_text()
+    self_check=decode(dict(bytes=bytes.fromhex(fixture).hex(),address='0xffffff80025f5aa4'))
+    assert len(self_check['instructions'])==135 and not self_check['boundary_or_tail_targets'],self_check
     version=subprocess.check_output(['sw_vers','-productVersion'],text=True).strip()
     build=subprocess.check_output(['sw_vers','-buildVersion'],text=True).strip()
     metadata=dict(os_version=version,os_build=build,kernel=platform.release(),
