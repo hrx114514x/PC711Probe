@@ -11,6 +11,7 @@ import mmap
 from pathlib import Path
 import platform
 import subprocess
+import struct
 import tempfile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CS_GRP_JUMP, CS_GRP_RET
 from capstone.x86 import X86_OP_IMM, X86_INS_JMP
@@ -53,6 +54,39 @@ def decode(window):
                 boundary_or_tail_targets=sorted(set(limits)),limit_hit=bool(todo))
 
 
+def direct_call_names(data,decoded):
+    targets={int(i['operands'],16) for w in decoded.values() for i in w.get('instructions',[])
+             if i['mnemonic']=='call' and i['operands'].startswith('0x')}
+    result={hex(address):[] for address in targets}
+    modules=[(0,'root image')]
+    for cursor,cmd,size in tool.commands(data,0):
+        if cmd==tool.LC_FILESET_ENTRY and size>=32:
+            _,_,_,offset,nameoff,_=struct.unpack('<IIQQII',tool.checked(data,cursor,32))
+            if 32<=nameoff<size:
+                name=tool.checked(data,cursor+nameoff,size-nameoff).split(b'\0',1)[0].decode('utf8',errors='replace')
+                modules.append((offset,name))
+    for module,label in modules:
+        mapped=set()
+        for address in targets:
+            try:tool.translate(data,module,address,1);mapped.add(address)
+            except ValueError:pass
+        if not mapped:continue
+        for cursor,cmd,size in tool.commands(data,module):
+            if cmd!=2 or size!=24:continue
+            _,_,symoff,count,stroff,strsize=struct.unpack('<6I',tool.checked(data,cursor,24))
+            if count>1000000:continue
+            if count:tool.checked(data,symoff,count*16)
+            if strsize:tool.checked(data,stroff,strsize)
+            for index in range(count):
+                strx,kind,_,_,value=struct.unpack('<IBBHQ',tool.checked(data,symoff+index*16,16))
+                if value not in mapped or kind & 0xE0 or (kind & 0xE)!=0xE or strx>=strsize:continue
+                raw=tool.checked(data,stroff+strx,min(1024,strsize-strx))
+                end=raw.find(b'\0')
+                if end<0:continue
+                result[hex(value)].append(dict(module=label,symbol=raw[:end].decode('utf8',errors='replace')))
+    return result
+
+
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     fixture=(ROOT/'Tests/fixtures/InitializePCI-580.hex').read_text()
@@ -89,7 +123,8 @@ def main():
                         if w.get('status')=='captured':clean.update(decode(w))
                         decoded[name]=clean
                     report=dict(host=metadata,input_path=str(path),input_sha256=hashlib.sha256(data).hexdigest(),
-                                module_uuid=tool.uuid(data,module),functions=decoded)
+                                module_uuid=tool.uuid(data,module),functions=decoded,
+                                direct_call_symbols=direct_call_names(data,decoded))
                 (OUT/'nvme-reference.json').write_text(json.dumps(report,indent=2)+'\n')
                 attempts.append(dict(path=str(path),status='analyzed'))
                 if all(w.get('status')=='captured' for w in windows.values()):break
