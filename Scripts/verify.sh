@@ -76,8 +76,8 @@ grep -q '^Required Notice: Copyright 2026 hrx114514x\.$' "$license"
 grep -q 'PolyForm Noncommercial 1.0.0' "$plist"
 nm -m "$binary" | grep -q 'weak external __ZN32IOPCIMessagedInterruptController24allocateDeviceInterruptsEP9IOServicejjPyPj'
 nm -m "$force_binary" | grep -q 'weak external __ZN32IOPCIMessagedInterruptController24allocateDeviceInterruptsEP9IOServicejjPyPj'
-strings -a "$force_binary" | grep -q 'force variant targets every NVMe class 01:08:02 controller'
-if strings -a "$binary" | grep -q 'force variant targets every NVMe class 01:08:02 controller'; then
+strings -a "$force_binary" | grep -q 'force variant targets NVMe class 01:08:02 except quarantined 144D:A80D'
+if strings -a "$binary" | grep -q 'force variant targets NVMe class 01:08:02 except quarantined 144D:A80D'; then
 	echo "Standard variant unexpectedly contains Force behavior" >&2
 	exit 1
 fi
@@ -101,6 +101,10 @@ if grep -q 'KernelVersion::Tahoe' "$source"; then
 	echo "macOS 26 must remain native" >&2
 	exit 1
 fi
+
+xcrun clang++ -std=c++14 -Wall -Wextra -Werror \
+	"$project_dir/Tests/issue9_policy.cpp" -o "$project_dir/build/issue9-policy-test"
+"$project_dir/build/issue9-policy-test"
 
 echo "Static compatibility checks passed"
 shasum -a 256 "$binary" "$plist" "$force_binary" "$force_plist"

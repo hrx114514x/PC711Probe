@@ -12,6 +12,7 @@
 #include <Headers/kern_patcher.hpp>
 #include <Headers/kern_util.hpp>
 #include <Headers/plugin_start.hpp>
+#include "Issue9Policy.hpp"
 
 namespace {
 
@@ -86,8 +87,13 @@ public:
 	void *compatReserved() { return reserved; }
 };
 
+bool compatibilityEnabled() {
+	return Issue9Policy::enabled(static_cast<int>(getKernelVersion()),
+		ADDPR(startSuccess), checkKernelArgument("-pc711poff"));
+}
+
 bool isTargetNVMeDevice(IOPCIDevice *pci) {
-	if (!pci)
+	if (!compatibilityEnabled() || !pci)
 		return false;
 
 	const auto classRevision = pci->configRead32(kIOPCIConfigRevisionID);
@@ -95,7 +101,11 @@ bool isTargetNVMeDevice(IOPCIDevice *pci) {
 		return false;
 
 #if PC711PROBE_FORCE_VARIANT
-	return true;
+	// Issue #9: quarantine the reported controller in both mutation paths.
+	// This prevents the workaround, not the native Apple driver, from running.
+	return !Issue9Policy::quarantined(
+		pci->configRead16(kIOPCIConfigVendorID),
+		pci->configRead16(kIOPCIConfigDeviceID));
 #else
 	const auto vendor = pci->configRead16(kIOPCIConfigVendorID);
 	const auto device = pci->configRead16(kIOPCIConfigDeviceID);
@@ -367,7 +377,8 @@ IOFilterInterruptEventSource *PC711ProbePlugin::wrapCreateDeviceInterrupt(
 
 	uint8_t flagsBefore {0};
 	uint8_t flagsAfter {0};
-	if (getKernelVersion() >= KernelVersion::Sonoma) {
+	if (Issue9Policy::mayClearFlag(static_cast<int>(getKernelVersion()),
+		result == kIOReturnSuccess, eventSource != nullptr)) {
 		auto flags = reinterpret_cast<volatile uint8_t *>(controllerPointer) +
 			kControllerFlagsOffset;
 		flagsBefore = *flags;
@@ -408,7 +419,7 @@ void PC711ProbePlugin::processPCIKext(void *context, KernelPatcher &patcher,
 void PC711ProbePlugin::processKext(void *context, KernelPatcher &patcher,
 		size_t index, mach_vm_address_t address, size_t size) {
 	auto instance = static_cast<PC711ProbePlugin *>(context);
-	if (!instance || index != instance->kextInfo.loadIndex)
+	if (!compatibilityEnabled() || !instance || index != instance->kextInfo.loadIndex)
 		return;
 
 	KernelPatcher::RouteRequest request {
@@ -439,7 +450,7 @@ void PC711ProbePlugin::processKext(void *context, KernelPatcher &patcher,
 
 void PC711ProbePlugin::init() {
 #if PC711PROBE_FORCE_VARIANT
-	SYSLOG("probe", "force variant targets every NVMe class 01:08:02 controller");
+	SYSLOG("probe", "force variant targets NVMe class 01:08:02 except quarantined 144D:A80D");
 #endif
 	const auto error = lilu.onKextLoad(&kextInfo, 1, processKext, this);
 	if (error != LiluAPI::Error::NoError)

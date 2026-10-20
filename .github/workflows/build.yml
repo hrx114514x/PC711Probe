@@ -16,3 +16,21 @@ jobs:
           submodules: recursive
       - name: Build and run static checks
         run: ./Scripts/verify.sh
+      - name: Test offline Issue 9 evidence extraction
+        run: |
+          python3 -m unittest discover -s Tests -p 'test_issue9_*.py' -v
+          python3 Scripts/generate-issue9-fingerprints.py --check
+      - name: Build and inspect Issue 9 read-only diagnostic
+        run: sh Diagnostics/verify-macos.sh
+      - name: Upload review-only diagnostic and verification records
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue9-review-only-${{ github.sha }}
+          path: |
+            build/Issue9Review/PM9C1aReadOnly.kext
+            build/Issue9Review/undefined-symbols.txt
+            build/Issue9Review/REVIEW_ONLY.txt
+            build/Issue9Review/PM9C1aReadOnly-0.3.0-REVIEW_ONLY.tar.gz
+            docs/ISSUE9_REVIEW.md
+            docs/ISSUE9_RUNTIME.md
+          if-no-files-found: error
