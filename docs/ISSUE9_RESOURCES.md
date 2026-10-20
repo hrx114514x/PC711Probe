@@ -35,15 +35,48 @@ This public revision is a source reference, not an independently verified disass
 
 An ad hoc physical map or injected IODeviceMemory object would not repair native allocation ownership or the bridge window. Writing Linux's base/limit into the bridge would additionally require checking macOS's current root apertures and competing assignments. The present snapshots do not supply that authority.
 
-## One next record to choose the first correction
+## Resource publication record received
 
-Obtain the Samsung endpoint's native **resource publication record: `reg` and `assigned-addresses`**, with its node header, pcidebug, IOPCIResourced and same-boot InitializePCI dictionary. This requires no new kext, install, NVRAM reset, PCI probe, PCI write or SSD write:
+The [next photo](https://github.com/hrx114514x/PC711Probe/issues/9#issuecomment-6282003744) contains a 40-byte `reg` value. The transcription below is checked visually against the photograph; it is not a machine-exported file:
+
+```text
+00000100000000000000000000000000000000001000010200000000000000000000000000400000
+```
+
+Interpreted as two native x86 five-dword records, it contains:
+
+| Record | Dwords | Interpretation |
+| --- | --- | --- |
+| 0 | 00010000 00000000 00000000 00000000 00000000 | Configuration-space entry for 01:00.0. |
+| 1 | 02010010 00000000 00000000 00000000 00004000 | Memory-space request for BAR0/register 0x10 at 01:00.0, length **0x4000 = 16 KiB**. |
+
+The zero address cells in `reg` are normal in the public property-construction path; they are not evidence that the hardware BAR itself contains zero. The important combination is a nonzero 16-KiB request **and no `assigned-addresses` property in the displayed target output**. This selects native PCI allocation/resource inputs as the next correction area; a missing BAR-size request is no longer the leading explanation for this capture. `IOPCIResourced=Yes` still does not prove a memory allocation was published.
+
+This photo's provider ID is `0x100000400` (4294968320), whereas the earlier complete 0.3.0 observation used 4294968326. No LastInitializePCI dictionary is shown in this new output. Consequently, the raw publication is useful but it is not a same-call/same-boot correlation with the earlier closed-window snapshot. The earlier observation remains separately valid; missing diagnostic properties must not be filled in from it.
+
+No additional Recovery capture is needed just to choose between the three rows below. The remaining implementation input is the **actual test EFI configuration and its enabled ACPI overrides**, so that root resource windows, PCI-affecting patches/properties and pci/npci boot arguments can be reviewed before preparing a minimal correction. The filename of a Golden EFI mentioned in the discussion is not its contents. A config review can identify injected constraints; it cannot by itself prove the contents of unprovided firmware-original `_CRS` tables.
+
+### Offline review bundle
+
+`Scripts/issue9-config-review.py` reads an existing `EFI/OC` folder and creates an incomplete review-only ZIP. It does not modify the source, boot macOS, read live NVRAM, install a kext or upload anything. It includes ACPI/Booter/DeviceProperties/Kernel/UEFI settings and enabled AML files; it retains only boot-args Add/Delete and persistence booleans from NVRAM. It omits PlatformInfo, Misc/security fields, comments, Arguments, common identifier/secret property names, and MSDM/SLIC licensing tables. The script preserves binary plist data for patch review, rejects paths that escape ACPI, and records missing files.
+
+Run against the **exact testing EFI used for the latest screenshot**, or an unchanged copy of it. For example, from a checkout on Windows (replace X with the actual location):
+
+```powershell
+python Scripts/issue9-config-review.py "X:\EFI\OC" --out "..\issue9-config-review.zip"
+```
+
+On macOS/Linux use `python3` and the corresponding OC path. Output must be new and outside the source EFI/OC tree. Inspect the resulting ZIP before attaching it: boot-args, retained DeviceProperties and AML bodies are not guaranteed to be anonymous. `REVIEW_ONLY.plist` is intentionally incomplete and **must never replace the bootable config.plist**. The exported configuration does not prove which boot arguments or ACPI tables were effective at runtime. No new diagnostic kext is needed for this step.
+
+## Original request and decision criteria
+
+The preceding request collected the Samsung endpoint's native **resource publication record: `reg` and `assigned-addresses`**, with its node header, pcidebug and IOPCIResourced. The requested InitializePCI dictionary was not present in the received capture. The command was:
 
 ```sh
 ioreg -r -n pci144d,a80d -lw0 | grep -E 'reg|assigned|pcidebug|Resourced|LastInitializePCI'
 ```
 
-Photograph the complete output. A visible target header plus a missing property is useful evidence. Entirely empty output is a selector failure, not evidence of a missing property; in that case retain the actual Samsung node name from the existing IORegistry view. The `reg` record may wrap onto multiple screen lines and must not be cropped.
+A visible target header plus a missing property is useful evidence; entirely empty output would instead be a selector failure. The received photo includes the target header and both complete `reg` records.
 
 | Native publication record | First correction layer to investigate |
 | --- | --- |
@@ -51,4 +84,4 @@ Photograph the complete output. A visible target header plus a missing property 
 | Nonzero BAR0 request, no assigned BAR0 record | PCI allocation/root-bridge resource constraints. Select the relevant EFI/ACPI or allocator correction after examining that path; changing NVMe return values cannot repair it. |
 | Assigned BAR0 base/length present, IODeviceMemory absent | Descriptor publication/resource lifecycle, while also reconciling the independently closed bridge window before MMIO is attempted. |
 
-This record chooses the correction layer; it cannot promise that no further layer-specific evidence will be needed to validate an implementation. No 0.4.0 diagnostic or speculative repair kext is issued for this result. The immediate acceptance criterion remains physical detection of the Samsung SSD, followed by separate I/O, installation, boot and stability validation. Draft PR #10 remains a research change.
+The received record selects the middle row, subject to the native-property/source-reference limits above. The next implementation input is the offline configuration review bundle, not a repeat of this capture. No 0.4.0 diagnostic or speculative repair kext is issued for this result. The immediate acceptance criterion remains physical detection of the Samsung SSD, followed by separate I/O, installation, boot and stability validation. Draft PR #10 remains a research change.
