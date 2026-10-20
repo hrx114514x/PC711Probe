@@ -6,7 +6,7 @@ The intended end result for Issue 9 is a PM9C1a-specific compatibility fix suppo
 
 The [reporter's 0.2.0 test](https://github.com/hrx114514x/PC711Probe/issues/9#issuecomment-6251999746) on Sequoia 15.6 / Darwin 24.6.0 records InitializePCI `Result=0`, `ObservedExitMask=2`, `Tracked=1`, `InstalledRoutes=127`, Call 3, ControllerID 4294968412 and ProviderID 4294968319. The screenshots agree on this complete observation: the original map-unavailable helper was reached. This does not yet distinguish a missing BAR0 descriptor, a failed new map, or an unavailable saved map. The comment transcribes the interrupt result as 0, whereas the attached photos show 1; do not use that discrepancy as evidence of interrupt failure. Even a non-null event source does not prove interrupt delivery.
 
-Version 0.3.0 keeps the same seven routes and code fingerprints, adding passive snapshots before InitializePCI and at its already-observed map exit. It reads the existing registry property table, descriptor tags/lengths, raw PCI configuration, provider lifecycle state and the nearest upstream PCI bridge window. It does not request a new mapping, interrupt resolution, resource construction or PCI configuration change. The new version has not yet been tested on the reporter's hardware.
+Version 0.3.0 keeps the same seven routes and code fingerprints, adding passive snapshots before InitializePCI and at its already-observed map exit. It reads the existing registry property table, descriptor tags/lengths, raw PCI configuration, provider lifecycle state and the nearest upstream PCI bridge window. It does not request a new mapping, interrupt resolution, resource construction or PCI configuration change. The [subsequent 0.3.0 hardware report](https://github.com/hrx114514x/PC711Probe/issues/9#issuecomment-6273261459) captured the missing IODeviceMemory property and a closed upstream non-prefetchable window. See [resource evidence and correction decision](ISSUE9_RESOURCES.md); no permanent fix has been validated.
 
 `PM9C1aROResBefore` and `PM9C1aROResAtMapExit` contain:
 
@@ -75,7 +75,7 @@ Use the separate test EFI with Lilu 1.7.3 or newer. Keep the Golden EFI availabl
 | Explicit activation | `-pm9c1adiag` |
 | Disable argument | `-pm9c1adiagoff` takes precedence |
 
-Use the CI artifact's `PM9C1aReadOnly-0.3.0-REVIEW_ONLY.tar.gz` to preserve Unix permissions, or build with `sh Diagnostics/verify-macos.sh`. No installation is performed by the build scripts. The earlier 0.2.0 hardware observation does not validate the added 0.3.0 snapshot implementation.
+Use the CI artifact's `PM9C1aReadOnly-0.3.0-REVIEW_ONLY.tar.gz` to preserve Unix permissions, or build with `sh Diagnostics/verify-macos.sh`. No installation is performed by the build scripts. The 0.3.0 hardware report validates the observed snapshot output on that boot; it does not establish general diagnostic safety or storage compatibility.
 
 After booting Recovery, run `sh Diagnostics/capture-recovery.sh`. It records loaded kext versions, IORegistry, unified-log output, a best-effort dmesg snapshot and physical-disk listing under `/tmp`. The existing Apple expression strings may already identify the failure in baseline logs; the new dictionary is intended to retain the branch observation if boot logs are unavailable. Copy evidence to separate media before reboot and review serial/SMBIOS information before sharing.
 
